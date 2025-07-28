@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 @Embeddable // Marks this class as embeddable within an entity
 @Data
@@ -15,8 +16,8 @@ import java.io.Serializable;
 public class DoctorClinicAffiliationId implements Serializable {
 
     @Column(name = "doctor_id")
-    private Long doctorId;
+    private UUID doctorId;
 
     @Column(name = "clinic_id")
-    private Long clinicId;
+    private UUID clinicId;
 }

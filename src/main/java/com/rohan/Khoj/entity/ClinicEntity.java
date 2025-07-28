@@ -3,23 +3,21 @@ package com.rohan.Khoj.entity;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.GenericGenerator;
+import org.springframework.security.core.GrantedAuthority;
 
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
+@Data
 @Entity
 @Table(name = "clinics")
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
+@SuperBuilder
 @ToString(exclude = {"doctorAffiliations", "appointments"})
-@EqualsAndHashCode(exclude = {"doctorAffiliations", "appointments"})
-public class ClinicEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "clinic_id")
-    private Long id;
+@EqualsAndHashCode(callSuper = true, exclude = {"doctorAffiliations", "appointments"})
+public class ClinicEntity extends BaseUserEntity {
 
     @Column(name = "name", nullable = false, length = 255)
     private String name;
@@ -33,7 +31,7 @@ public class ClinicEntity {
     @Column(name = "pin_code", length = 20)
     private String pinCode;
     @Column(name = "country", length = 100, columnDefinition = "VARCHAR(100) DEFAULT 'India'")
-    private String country = "India";
+    private String country;
 
     // Multivalued Phone numbers: Using @ElementCollection for simplicity.
     // This creates a separate table (e.g., clinic_phone_numbers) linked by clinic_id.
@@ -42,11 +40,18 @@ public class ClinicEntity {
     @Column(name = "phone_number", nullable = false, length = 20)
     private Set<String> phoneNumbers;
 
-    @Column(name = "email", unique = true, length = 255)
-    private String email;
-
     @Column(name = "website", length = 255)
     private String website;
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(Role.ROLE_CLINIC); // Clinic always has ROLE_CLINIC
+    }
+
+    @Override
+    public UserType getUserType() {
+        return UserType.CLINIC; // Or DOCTOR, CLINIC as appropriate
+    }
 
     // OpeningHours: Can be complex. For simplicity, let's use a JSON String or a Map for now.
     // If a dedicated table for daily hours is needed, it would be another @OneToMany.

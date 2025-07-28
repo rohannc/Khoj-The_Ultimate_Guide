@@ -11,6 +11,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "doctor_clinic_affiliation") // Junction table for M:N relationship
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString(exclude = {"doctor", "clinic"})
@@ -41,13 +42,17 @@ public class DoctorClinicAffiliationEntity implements Serializable { // Serializ
     @Column(name = "shift_details", columnDefinition = "TEXT") // Could be more structured
     private String shiftDetails; // e.g., "Mon-Wed 9AM-1PM"
 
+    @Column(name = "charge", nullable = false, length = 10)
+    private double charge;
+
     // Helper constructor to simplify creation
-    public DoctorClinicAffiliationEntity(DoctorEntity doctor, ClinicEntity clinic, LocalDate joiningDate, String roleInClinic, String shiftDetails) {
+    public DoctorClinicAffiliationEntity(DoctorEntity doctor, ClinicEntity clinic, LocalDate joiningDate, String roleInClinic, String shiftDetails, double charge) {
         this.doctor = doctor;
         this.clinic = clinic;
         this.joiningDate = joiningDate;
         this.roleInClinic = roleInClinic;
         this.shiftDetails = shiftDetails;
+        this.charge = charge;
         this.id = new DoctorClinicAffiliationId(doctor.getId(), clinic.getId());
     }
 }

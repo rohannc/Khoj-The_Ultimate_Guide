@@ -9,9 +9,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 
-public interface AppointmentRepository extends JpaRepository<AppointmentDetailEntity, Long> {
+public interface AppointmentRepository extends JpaRepository<AppointmentDetailEntity, UUID> {
 
     // Find appointments for a specific patient
     List<AppointmentDetailEntity> findByPatient(PatientEntity patient);

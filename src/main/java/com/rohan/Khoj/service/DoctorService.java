@@ -1,101 +1,201 @@
 package com.rohan.Khoj.service;
 
+// Removed unused imports: ClinicModelMapperConfig, Autowired
+import com.rohan.Khoj.customException.ConflictException;
+import com.rohan.Khoj.customException.ResourceNotFoundException;
+import com.rohan.Khoj.dto.DoctorDTO; // Response DTO
+import com.rohan.Khoj.dto.DoctorUpdateRequestDTO; // Request DTO
+import com.rohan.Khoj.dto.DoctorClinicAffiliationDTO; // New affiliation DTO
+import com.rohan.Khoj.dto.ClinicDTO; // For getClinicsForDoctor response
 import com.rohan.Khoj.entity.ClinicEntity;
 import com.rohan.Khoj.entity.DoctorClinicAffiliationEntity;
 import com.rohan.Khoj.entity.DoctorEntity;
 import com.rohan.Khoj.repository.DoctorClinicAffiliationRepository;
 import com.rohan.Khoj.repository.DoctorRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true) // Default for service methods
 public class DoctorService {
 
-    @Autowired
-    private DoctorRepository doctorRepository;
+    private final DoctorRepository doctorRepository;
+    private final ModelMapper modelMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final DoctorClinicAffiliationRepository affiliationRepository; // Injected via constructor
+    private final ClinicService clinicService; // Injected via constructor
 
-    @Autowired
-    private DoctorClinicAffiliationRepository affiliationRepository;
+    // --- Update Operation ---
 
-    @Autowired
-    private ClinicService clinicService; // Inject ClinicService to fetch Clinic objects
+    /**
+     * Updates an existing doctor's details based on the provided DTO.
+     * Handles uniqueness checks for username, email, and medical license number, and password hashing.
+     *
+     * @param id The UUID of the doctor to update.
+     * @param updateRequestDTO The DTO containing the updated doctor details.
+     * @return The updated DoctorDto.
+     * @throws ResourceNotFoundException if the doctor with the given ID is not found.
+     * @throws ConflictException if username, email, or medical license number update conflicts with an existing user.
+     */
+    @Transactional // This operation modifies data
+    public DoctorDTO updateDoctor(UUID id, DoctorUpdateRequestDTO updateRequestDTO) {
+        DoctorEntity doctorToUpdate = doctorRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + id));
 
-    // --- CRUD Operations ---
-
-    @Transactional
-    public DoctorEntity createDoctor(DoctorEntity doctor) {
-        if (doctorRepository.findByEmail(doctor.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Doctor with this email already exists.");
+        // --- Handle Username Update ---
+        if (updateRequestDTO.getUsername() != null && !updateRequestDTO.getUsername().equals(doctorToUpdate.getUsername())) {
+            Optional<DoctorEntity> existingDoctorWithNewUsername = doctorRepository.findByUsername(updateRequestDTO.getUsername());
+            if (existingDoctorWithNewUsername.isPresent() && !existingDoctorWithNewUsername.get().getId().equals(id)) {
+                throw new ConflictException("Username '" + updateRequestDTO.getUsername() + "' is already taken by another doctor.");
+            }
+            doctorToUpdate.setUsername(updateRequestDTO.getUsername());
         }
-        if (doctorRepository.findByRegistrationNumber(doctor.getRegistrationNumber()).isPresent()) {
-            throw new IllegalArgumentException("Doctor with this license number already exists.");
+
+        // --- Handle Email Update ---
+        if (updateRequestDTO.getEmail() != null && !updateRequestDTO.getEmail().equals(doctorToUpdate.getEmailId())) {
+            // Ensure DoctorRepository has 'Optional<DoctorEntity> findByEmailId(String emailId);'
+            Optional<DoctorEntity> existingDoctorWithNewEmail = doctorRepository.findByEmailId(updateRequestDTO.getEmail());
+            if (existingDoctorWithNewEmail.isPresent() && !existingDoctorWithNewEmail.get().getId().equals(id)) {
+                throw new ConflictException("Email '" + updateRequestDTO.getEmail() + "' is already in use by another doctor.");
+            }
+            doctorToUpdate.setEmailId(updateRequestDTO.getEmail());
         }
-        return doctorRepository.save(doctor);
+
+        // --- Handle Password Update ---
+        if (updateRequestDTO.getPassword() != null && !updateRequestDTO.getPassword().isEmpty()) {
+            doctorToUpdate.setPassword(passwordEncoder.encode(updateRequestDTO.getPassword())); // Corrected method name
+        }
+
+        // --- Handle Medical License Number Update ---
+        // Assuming DoctorEntity's field name is 'medicalLicenseNumber' as in DTO
+        if (updateRequestDTO.getRegistrationNumber() != null && !updateRequestDTO.getRegistrationNumber().equals(doctorToUpdate.getRegistrationNumber())) {
+            Optional<DoctorEntity> existingDoctorWithNewLicense = doctorRepository.findByRegistrationNumber(updateRequestDTO.getRegistrationNumber());
+            if (existingDoctorWithNewLicense.isPresent() && !existingDoctorWithNewLicense.get().getId().equals(id)) {
+                throw new ConflictException("Medical license number '" + updateRequestDTO.getRegistrationNumber() + "' is already registered to another doctor.");
+            }
+            doctorToUpdate.setRegistrationNumber(updateRequestDTO.getRegistrationNumber()); // Corrected method name
+        }
+
+        // --- Map other fields using ModelMapper ---
+        modelMapper.map(updateRequestDTO, doctorToUpdate);
+
+        // Update updatedAt timestamp
+        doctorToUpdate.setUpdatedAt(LocalDateTime.now());
+
+        // Save the updated entity
+        DoctorEntity updatedDoctorEntity = doctorRepository.save(doctorToUpdate);
+
+        // Map the saved entity back to a DTO for the response
+        return modelMapper.map(updatedDoctorEntity, DoctorDTO.class);
     }
 
-    public List<DoctorEntity> getAllDoctors() {
-        return doctorRepository.findAll();
+    // --- Retrieval Operations (Returning DTOs) ---
+
+    /**
+     * Finds a doctor by their username.
+     * @param username The username to search for.
+     * @return An Optional containing the DoctorDto if found.
+     */
+    public Optional<DoctorDTO> getDoctorByUsername(String username) { // Renamed for consistency
+        return doctorRepository.findByUsername(username)
+                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class));
     }
 
-    public Optional<DoctorEntity> getDoctorById(Long id) {
+    // Add this helper method for internal service use
+    /**
+     * Finds a DoctorEntity by its ID. Used internally by other services when the entity itself is needed.
+     *
+     * @param id The UUID of the doctor.
+     * @return An Optional containing the DoctorEntity if found.
+     */
+    public Optional<DoctorEntity> getDoctorEntityById(UUID id) {
         return doctorRepository.findById(id);
     }
 
-    @Transactional
-    public DoctorEntity updateDoctor(Long id, DoctorEntity updatedDoctor) {
-        return doctorRepository.findById(id).map(doctor -> {
-            doctor.setFirstName(updatedDoctor.getFirstName());
-            doctor.setLastName(updatedDoctor.getLastName());
-            doctor.setDateOfBirth(updatedDoctor.getDateOfBirth());
-            doctor.setGender(updatedDoctor.getGender());
-            doctor.setPhoneNumbers(updatedDoctor.getPhoneNumbers());
-
-            if (updatedDoctor.getEmail() != null && !updatedDoctor.getEmail().equals(doctor.getEmail())) {
-                if (doctorRepository.findByEmail(updatedDoctor.getEmail()).isPresent()) {
-                    throw new IllegalArgumentException("New email already in use by another doctor.");
-                }
-                doctor.setEmail(updatedDoctor.getEmail());
-            }
-            if (updatedDoctor.getRegistrationNumber() != null && !updatedDoctor.getRegistrationNumber().equals(doctor.getRegistrationNumber())) {
-                if (doctorRepository.findByRegistrationNumber(updatedDoctor.getRegistrationNumber()).isPresent()) {
-                    throw new IllegalArgumentException("New license number already in use by another doctor.");
-                }
-                doctor.setRegistrationNumber(updatedDoctor.getRegistrationNumber());
-            }
-            doctor.setSpecializations(updatedDoctor.getSpecializations());
-            doctor.setQualifications(updatedDoctor.getQualifications());
-
-            return doctorRepository.save(doctor);
-        }).orElseThrow(() -> new RuntimeException("Doctor not found with id: " + id));
+    /**
+     * Retrieves all doctors, mapped to DTOs.
+     * @return A list of DoctorDto.
+     */
+    public List<DoctorDTO> getAllDoctors() {
+        return doctorRepository.findAll().stream()
+                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
+                .collect(Collectors.toList());
     }
 
-    @Transactional
-    public void deleteDoctor(Long id) {
-        if (!doctorRepository.existsById(id)) {
-            throw new RuntimeException("Doctor not found with id: " + id);
-        }
-        doctorRepository.deleteById(id);
+    /**
+     * Finds a doctor by their ID, mapped to a DTO.
+     * @param id The UUID of the doctor to search for.
+     * @return An Optional containing the DoctorDto if found.
+     */
+    public Optional<DoctorDTO> getDoctorById(UUID id) {
+        return doctorRepository.findById(id)
+                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class));
     }
 
-    // --- Custom Business Logic ---
-
-    public Optional<DoctorEntity> getDoctorByEmail(String email) {
-        return doctorRepository.findByEmail(email);
+    /**
+     * Finds a doctor by their email ID, mapped to a DTO.
+     * @param emailId The email ID to search for.
+     * @return An Optional containing the DoctorDto if found.
+     */
+    public Optional<DoctorDTO> getDoctorByEmail(String emailId) { // Renamed for consistency
+        return doctorRepository.findByEmailId(emailId)
+                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class));
     }
 
-    public List<DoctorEntity> getDoctorsBySpecialization(String specialization) {
-        return doctorRepository.findBySpecializationsContaining(specialization);
+    /**
+     * Finds doctors by specialization, mapped to DTOs.
+     * @param specialization The specialization to search for.
+     * @return A list of DoctorDto.
+     */
+    public List<DoctorDTO> getDoctorsBySpecialization(String specialization) {
+        // Assuming findBySpecializationsContaining is a correct repository method for a string
+        return doctorRepository.findBySpecializationsContaining(specialization).stream()
+                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
+                .collect(Collectors.toList());
     }
 
-    public List<DoctorEntity> getDoctorsByLastName(String lastName) {
-        return doctorRepository.findByLastNameContaining(lastName);
+    /**
+     * Finds doctors by last name, mapped to DTOs.
+     * @param lastName The last name to search for.
+     * @return A list of DoctorDto.
+     */
+    public List<DoctorDTO> getDoctorsByLastName(String lastName) {
+        // Assuming findByLastNameContaining is a correct repository method for a string
+        return doctorRepository.findByLastNameContaining(lastName).stream()
+                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
+                .collect(Collectors.toList());
     }
+
+    // --- Delete Operation ---
+
+    /**
+     * Deletes a doctor by their ID.
+     * @param id The UUID of the doctor to delete.
+     * @return The DoctorDto of the doctor that was deleted.
+     * @throws ResourceNotFoundException if the doctor with the given ID is not found.
+     */
+    @Transactional // This operation modifies data
+    public DoctorDTO deleteDoctor(UUID id) {
+        DoctorEntity doctorToDelete = doctorRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + id));
+
+        doctorRepository.delete(doctorToDelete); // Use delete(entity) for fewer queries
+
+        return modelMapper.map(doctorToDelete, DoctorDTO.class); // Return the DTO of the deleted doctor
+    }
+
+    // --- Doctor-Clinic Affiliation Operations ---
 
     /**
      * Affiliates a doctor with a clinic.
@@ -104,52 +204,77 @@ public class DoctorService {
      * @param joiningDate The date the doctor joined the clinic.
      * @param roleInClinic The role of the doctor in the clinic (e.g., "Full-time").
      * @param shiftDetails Details about the doctor's shifts at this clinic.
-     * @return The created DoctorClinicAffiliation object.
+     * @param charge Doctor's per-consultation or hourly charge at this clinic.
+     * @return The created DoctorClinicAffiliationDTO object.
+     * @throws ResourceNotFoundException if doctor or clinic not found.
+     * @throws ConflictException if doctor is already affiliated with the clinic.
      */
     @Transactional
-    public DoctorClinicAffiliationEntity affiliateDoctorToClinic(Long doctorId, Long clinicId, LocalDate joiningDate, String roleInClinic, String shiftDetails) {
+    public DoctorClinicAffiliationDTO affiliateDoctorToClinic(UUID doctorId, UUID clinicId, LocalDate joiningDate, String roleInClinic, String shiftDetails, Double charge) {
         DoctorEntity doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + doctorId));
-        ClinicEntity clinic = clinicService.getClinicById(clinicId) // Use clinicService to get Clinic
-                .orElseThrow(() -> new RuntimeException("Clinic not found with id: " + clinicId));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
+        // Use clinicService to get ClinicEntity directly for internal service use
+        ClinicEntity clinic = clinicService.getClinicEntityById(clinicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + clinicId));
 
         if (affiliationRepository.existsByDoctorAndClinic(doctor, clinic)) {
-            throw new IllegalArgumentException("Doctor " + doctor.getLastName() + " is already affiliated with clinic " + clinic.getName());
+            throw new ConflictException("Doctor " + doctor.getFirstName() + " " + doctor.getLastName() + " is already affiliated with clinic " + clinic.getName());
         }
 
-        DoctorClinicAffiliationEntity affiliation = new DoctorClinicAffiliationEntity(doctor, clinic, joiningDate, roleInClinic, shiftDetails);
-        return affiliationRepository.save(affiliation);
+        // Build the affiliation entity
+        DoctorClinicAffiliationEntity affiliation = DoctorClinicAffiliationEntity.builder()
+                .doctor(doctor)
+                .clinic(clinic)
+                .joiningDate(joiningDate)
+                .roleInClinic(roleInClinic)
+                .shiftDetails(shiftDetails)
+                .charge(charge)
+                .build();
+
+        DoctorClinicAffiliationEntity savedAffiliation = affiliationRepository.save(affiliation);
+
+        // Map and return the DTO
+        return modelMapper.map(savedAffiliation, DoctorClinicAffiliationDTO.class);
     }
 
     /**
      * Removes a doctor's affiliation with a clinic.
      * @param doctorId The ID of the doctor.
      * @param clinicId The ID of the clinic.
+     * @throws ResourceNotFoundException if doctor, clinic, or affiliation not found.
      */
     @Transactional
-    public void removeDoctorAffiliation(Long doctorId, Long clinicId) {
+    public void removeDoctorAffiliation(UUID doctorId, UUID clinicId) {
         DoctorEntity doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + doctorId));
-        ClinicEntity clinic = clinicService.getClinicById(clinicId)
-                .orElseThrow(() -> new RuntimeException("Clinic not found with id: " + clinicId));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
+        ClinicEntity clinic = clinicService.getClinicEntityById(clinicId) // Use clinicService to get ClinicEntity
+                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id: " + clinicId));
 
         DoctorClinicAffiliationEntity affiliation = affiliationRepository.findByDoctorAndClinic(doctor, clinic)
-                .orElseThrow(() -> new RuntimeException("Affiliation not found between doctor " + doctorId + " and clinic " + clinicId));
+                .orElseThrow(() -> new ResourceNotFoundException("Affiliation not found between doctor " + doctorId + " and clinic " + clinicId));
 
         affiliationRepository.delete(affiliation);
     }
 
     /**
-     * Get all clinics a specific doctor is affiliated with.
+     * Get all clinics a specific doctor is affiliated with, mapped to Clinic DTOs.
      * @param doctorId The ID of the doctor.
-     * @return A list of clinics the doctor works at.
+     * @return A list of ClinicDto the doctor works at.
+     * @throws ResourceNotFoundException if the doctor is not found.
      */
-    public List<ClinicEntity> getClinicsForDoctor(Long doctorId) {
+    public List<ClinicDTO> getClinicsForDoctor(UUID doctorId) {
         DoctorEntity doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new RuntimeException("Doctor not found with id: " + doctorId));
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
+
         return affiliationRepository.findByDoctor(doctor).stream()
                 .map(DoctorClinicAffiliationEntity::getClinic)
+                .map(clinicEntity -> modelMapper.map(clinicEntity, ClinicDTO.class)) // Map ClinicEntity to ClinicDto
                 .collect(Collectors.toList());
     }
 
+    // You might also want a method to get a specific affiliation detail
+    public Optional<DoctorClinicAffiliationDTO> getDoctorClinicAffiliation(UUID affiliationId) {
+        return affiliationRepository.findById(affiliationId)
+                .map(affiliationEntity -> modelMapper.map(affiliationEntity, DoctorClinicAffiliationDTO.class));
+    }
 }

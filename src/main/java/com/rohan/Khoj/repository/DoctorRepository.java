@@ -6,11 +6,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface DoctorRepository extends JpaRepository<DoctorEntity, Long> {
+public interface DoctorRepository extends JpaRepository<DoctorEntity, UUID> {
     
-    Optional<DoctorEntity> findByEmail(String email);
+    Optional<DoctorEntity> findByEmailId(String emailId);
+
+    Optional<DoctorEntity> findByUsername(String doctorname);
     
     Optional<DoctorEntity> findByRegistrationNumber(String registrationNumber);
     
@@ -19,4 +22,8 @@ public interface DoctorRepository extends JpaRepository<DoctorEntity, Long> {
     List<DoctorEntity> findByFirstNameAndLastName(String firstName, String lastName);
     
     List<DoctorEntity> findByLastNameContaining(String lastName);
+
+    // Custom query method: Check if a doctor with a given email ID already exists
+    boolean existsByEmailId(String emailId);
+
 }
