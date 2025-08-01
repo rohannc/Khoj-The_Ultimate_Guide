@@ -5,10 +5,6 @@ import com.rohan.Khoj.customException.ConflictException;
 import com.rohan.Khoj.customException.ResourceNotFoundException;
 import com.rohan.Khoj.dto.DoctorDTO; // Response DTO
 import com.rohan.Khoj.dto.DoctorUpdateRequestDTO; // Request DTO
-import com.rohan.Khoj.dto.DoctorClinicAffiliationDTO; // New affiliation DTO
-import com.rohan.Khoj.dto.ClinicDTO; // For getClinicsForDoctor response
-import com.rohan.Khoj.entity.ClinicEntity;
-import com.rohan.Khoj.entity.DoctorClinicAffiliationEntity;
 import com.rohan.Khoj.entity.DoctorEntity;
 import com.rohan.Khoj.repository.DoctorClinicAffiliationRepository;
 import com.rohan.Khoj.repository.DoctorRepository;
@@ -160,7 +156,7 @@ public class DoctorService {
      */
     public List<DoctorDTO> getDoctorsBySpecialization(String specialization) {
         // Assuming findBySpecializationsContaining is a correct repository method for a string
-        return doctorRepository.findBySpecializationsContaining(specialization).stream()
+        return doctorRepository.findBySpecializationContaining(specialization).stream()
                 .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
                 .collect(Collectors.toList());
     }
@@ -195,86 +191,4 @@ public class DoctorService {
         return modelMapper.map(doctorToDelete, DoctorDTO.class); // Return the DTO of the deleted doctor
     }
 
-    // --- Doctor-Clinic Affiliation Operations ---
-
-    /**
-     * Affiliates a doctor with a clinic.
-     * @param doctorId The ID of the doctor.
-     * @param clinicId The ID of the clinic.
-     * @param joiningDate The date the doctor joined the clinic.
-     * @param roleInClinic The role of the doctor in the clinic (e.g., "Full-time").
-     * @param shiftDetails Details about the doctor's shifts at this clinic.
-     * @param charge Doctor's per-consultation or hourly charge at this clinic.
-     * @return The created DoctorClinicAffiliationDTO object.
-     * @throws ResourceNotFoundException if doctor or clinic not found.
-     * @throws ConflictException if doctor is already affiliated with the clinic.
-     */
-    @Transactional
-    public DoctorClinicAffiliationDTO affiliateDoctorToClinic(UUID doctorId, UUID clinicId, LocalDate joiningDate, String roleInClinic, String shiftDetails, Double charge) {
-        DoctorEntity doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
-        // Use clinicService to get ClinicEntity directly for internal service use
-        ClinicEntity clinic = clinicService.getClinicEntityById(clinicId)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + clinicId));
-
-        if (affiliationRepository.existsByDoctorAndClinic(doctor, clinic)) {
-            throw new ConflictException("Doctor " + doctor.getFirstName() + " " + doctor.getLastName() + " is already affiliated with clinic " + clinic.getName());
-        }
-
-        // Build the affiliation entity
-        DoctorClinicAffiliationEntity affiliation = DoctorClinicAffiliationEntity.builder()
-                .doctor(doctor)
-                .clinic(clinic)
-                .joiningDate(joiningDate)
-                .roleInClinic(roleInClinic)
-                .shiftDetails(shiftDetails)
-                .charge(charge)
-                .build();
-
-        DoctorClinicAffiliationEntity savedAffiliation = affiliationRepository.save(affiliation);
-
-        // Map and return the DTO
-        return modelMapper.map(savedAffiliation, DoctorClinicAffiliationDTO.class);
-    }
-
-    /**
-     * Removes a doctor's affiliation with a clinic.
-     * @param doctorId The ID of the doctor.
-     * @param clinicId The ID of the clinic.
-     * @throws ResourceNotFoundException if doctor, clinic, or affiliation not found.
-     */
-    @Transactional
-    public void removeDoctorAffiliation(UUID doctorId, UUID clinicId) {
-        DoctorEntity doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
-        ClinicEntity clinic = clinicService.getClinicEntityById(clinicId) // Use clinicService to get ClinicEntity
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id: " + clinicId));
-
-        DoctorClinicAffiliationEntity affiliation = affiliationRepository.findByDoctorAndClinic(doctor, clinic)
-                .orElseThrow(() -> new ResourceNotFoundException("Affiliation not found between doctor " + doctorId + " and clinic " + clinicId));
-
-        affiliationRepository.delete(affiliation);
-    }
-
-    /**
-     * Get all clinics a specific doctor is affiliated with, mapped to Clinic DTOs.
-     * @param doctorId The ID of the doctor.
-     * @return A list of ClinicDto the doctor works at.
-     * @throws ResourceNotFoundException if the doctor is not found.
-     */
-    public List<ClinicDTO> getClinicsForDoctor(UUID doctorId) {
-        DoctorEntity doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
-
-        return affiliationRepository.findByDoctor(doctor).stream()
-                .map(DoctorClinicAffiliationEntity::getClinic)
-                .map(clinicEntity -> modelMapper.map(clinicEntity, ClinicDTO.class)) // Map ClinicEntity to ClinicDto
-                .collect(Collectors.toList());
-    }
-
-    // You might also want a method to get a specific affiliation detail
-    public Optional<DoctorClinicAffiliationDTO> getDoctorClinicAffiliation(UUID affiliationId) {
-        return affiliationRepository.findById(affiliationId)
-                .map(affiliationEntity -> modelMapper.map(affiliationEntity, DoctorClinicAffiliationDTO.class));
-    }
 }

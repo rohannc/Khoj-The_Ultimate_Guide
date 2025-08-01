@@ -9,13 +9,22 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
+@NamedEntityGraph(
+        name = "appointment-with-details",
+        attributeNodes = {
+                @NamedAttributeNode("patient"),
+                @NamedAttributeNode("doctor"),
+                @NamedAttributeNode("clinic")
+        }
+)
 @Entity
+@Builder
 @Table(name = "appointments")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString(exclude = {"patient", "doctor", "clinic"})
-@EqualsAndHashCode(exclude = {"patient", "doctor", "clinic"})
+@EqualsAndHashCode(exclude = {"patient", "doctor", "clinic", "version"})
 public class AppointmentDetailEntity {
 
     @Id
@@ -26,17 +35,17 @@ public class AppointmentDetailEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_id", nullable = false)
-    @JsonBackReference("patient-appointments") // This side will NOT be serialized
+    @JsonBackReference("patient-appointments")
     private PatientEntity patient;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "doctor_id", nullable = false)
-    @JsonBackReference("doctor-appointments") // This side will NOT be serialized
+    @JsonBackReference("doctor-appointments")
     private DoctorEntity doctor;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "clinic_id", nullable = false)
-    @JsonBackReference("clinic-appointments") // This side will NOT be serialized
+    @JsonBackReference("clinic-appointments")
     private ClinicEntity clinic;
 
     @Column(name = "appointment_date", nullable = false)
@@ -45,7 +54,16 @@ public class AppointmentDetailEntity {
     @Column(name = "appointment_time", nullable = false)
     private LocalTime appointmentTime;
 
-    @Column(name = "status", length = 50, nullable = false) // e.g., "Scheduled", "Completed", "Cancelled"
+    // New field to store the calculated time slot key
+    @Column(name = "appointment_time_slot", length = 50, nullable = false)
+    private String appointmentTimeSlot;
+
+    @Column(name = "status", length = 50, nullable = false)
     private String status;
 
+    @Column(name = "reason", length = 512, nullable = false)
+    private String reason;
+
+    @Version // Added for optimistic locking
+    private Long version;
 }

@@ -35,7 +35,7 @@ public class AppointmentUpdateRequestDTO {
     @Size(max = 500, message = "Reason too long")
     private String reason; // Optional update
 
-    @NotBlank(message = "Status cannot be blank")
-    @Pattern(regexp = "Scheduled|Confirmed|Cancelled|Completed|Rescheduled", message = "Invalid appointment status")
-    private String status; // Status is commonly updated
+    // @NotBlank(message = "Status cannot be blank")
+    // @Pattern(regexp = "Scheduled|Confirmed|Cancelled|Completed|Rescheduled", message = "Invalid appointment status")
+    // private String status; // Status is commonly updated
 }

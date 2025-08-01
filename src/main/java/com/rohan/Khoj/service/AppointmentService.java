@@ -1,251 +1,237 @@
 package com.rohan.Khoj.service;
 
-// Removed unused @Autowired as @RequiredArgsConstructor is used
-// Removed unused imports if any from previous versions (e.g., ClinicModelMapperConfig)
-import com.rohan.Khoj.customException.BadRequestException;
-import com.rohan.Khoj.customException.ConflictException; // If you need specific appointment conflicts
 import com.rohan.Khoj.customException.ResourceNotFoundException;
-import com.rohan.Khoj.dto.AppointmentDTO; // New response DTO
-import com.rohan.Khoj.dto.AppointmentRequestDTO; // New request DTO
-import com.rohan.Khoj.dto.AppointmentUpdateRequestDTO; // New update DTO
-import com.rohan.Khoj.entity.AppointmentDetailEntity;
-import com.rohan.Khoj.entity.ClinicEntity;
-import com.rohan.Khoj.entity.DoctorEntity;
-import com.rohan.Khoj.entity.PatientEntity;
+import com.rohan.Khoj.dto.AppointmentDTO;
+import com.rohan.Khoj.dto.AppointmentRequestDTO;
+import com.rohan.Khoj.dto.AppointmentUpdateRequestDTO;
+import com.rohan.Khoj.embeddable.DoctorClinicAffiliationId;
+import com.rohan.Khoj.entity.*;
 import com.rohan.Khoj.repository.AppointmentRepository;
+import com.rohan.Khoj.repository.DoctorClinicAffiliationRepository;
+import com.rohan.Khoj.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.LocalTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor // Lombok annotation for constructor injection
-@Transactional(readOnly = true) // Default for service methods
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
-    private final ModelMapper modelMapper; // Inject ModelMapper
-    private final PatientService patientService; // To fetch Patient object
-    private final DoctorService doctorService;   // To fetch Doctor object
-    private final ClinicService clinicService;   // To fetch Clinic object
+    private final ModelMapper modelMapper;
+    private final PatientService patientService;
+    private final DoctorService doctorService;
+    private final ClinicService clinicService;
+    private final DoctorClinicAffiliationRepository affiliationRepository;
+    private final PatientRepository patientRepository; // Add PatientRepository here
 
-    // --- Create Operation ---
-
-    /**
-     * Schedules a new appointment based on the provided DTO.
-     * Validates existence of associated entities and sets default status.
-     *
-     * @param requestDTO The DTO containing appointment details.
-     * @return The created AppointmentDTO.
-     * @throws ResourceNotFoundException if patient, doctor, or clinic not found.
-     * @throws BadRequestException for business rule violations (e.g., availability).
-     */
     @Transactional
     public AppointmentDTO scheduleAppointment(AppointmentRequestDTO requestDTO) {
-        // 1. Fetch associated entities by ID from their respective services (using new get*EntityById methods)
-        PatientEntity patient = patientService.getPatientEntityById(requestDTO.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + requestDTO.getPatientId()));
-        DoctorEntity doctor = doctorService.getDoctorEntityById(requestDTO.getDoctorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + requestDTO.getDoctorId()));
-        ClinicEntity clinic = clinicService.getClinicEntityById(requestDTO.getClinicId())
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with ID: " + requestDTO.getClinicId()));
+        // 1. Check Affiliation: Verify the doctor is affiliated with the clinic.
+        DoctorClinicAffiliationId affiliationId = new DoctorClinicAffiliationId(requestDTO.getDoctorId(), requestDTO.getClinicId());
+        DoctorClinicAffiliationEntity affiliation = affiliationRepository.findById(affiliationId)
+                .orElseThrow(() -> new IllegalArgumentException("Doctor is not affiliated with this clinic."));
 
-        // 2. Map DTO to Entity for basic fields
-        AppointmentDetailEntity appointment = modelMapper.map(requestDTO, AppointmentDetailEntity.class);
-
-        // 3. Set the fetched managed entities back to the appointment object
-        appointment.setPatient(patient);
-        appointment.setDoctor(doctor);
-        appointment.setClinic(clinic);
-
-        // 4. Set default status and timestamps (if present in entity)
-        appointment.setStatus("Scheduled"); // Default status for new appointments
-        // appointment.setCreatedAt(LocalDateTime.now()); // If you have createdAt/updatedAt in entity
-
-        // 5. Further business validation (e.g., availability checks)
-        // This part can be complex and depends on specific business rules.
-        // Example:
-        /*
-        if (!doctorService.isDoctorAvailable(doctor.getId(), requestDTO.getAppointmentDate(), requestDTO.getAppointmentTime())) {
-             throw new BadRequestException("Doctor is not available at this time.");
+        if (affiliation.getStatus() != AffiliationStatus.APPROVED) {
+            throw new IllegalStateException("Affiliation between doctor and clinic is not active.");
         }
-        if (!clinicService.isClinicOpen(clinic.getId(), requestDTO.getAppointmentDate(), requestDTO.getAppointmentTime())) {
-             throw new BadRequestException("Clinic is closed at this time.");
-        }
-        // Check for double booking
-        if (appointmentRepository.findByDoctorAndAppointmentDateAndAppointmentTime(doctor, requestDTO.getAppointmentDate(), requestDTO.getAppointmentTime()).isPresent()) {
-            throw new ConflictException("Doctor already has an appointment at this specific time.");
-        }
-        */
 
-        // 6. Save the entity
-        AppointmentDetailEntity savedAppointment = appointmentRepository.save(appointment);
+        // 2. Check Valid Slot: Extract the slot and verify it's a valid working slot.
+        LocalDateTime appointmentDateTime = LocalDateTime.of(requestDTO.getAppointmentDate(), requestDTO.getAppointmentTime());
+        String slotKey = getSlotKey(appointmentDateTime);
 
-        // 7. Map and return the response DTO
-        return modelMapper.map(savedAppointment, AppointmentDTO.class);
+        if (affiliation.getShiftDetails() == null || !isValidShift(affiliation.getShiftDetails(), appointmentDateTime)) {
+            throw new IllegalStateException("Appointment time is outside the doctor's working hours.");
+        }
+
+        // 3. Check Patient Limit: Ensure the slot is not full.
+        long appointmentsBooked = appointmentRepository.countByDoctorAndClinicAndAppointmentTimeSlot(
+                affiliation.getDoctor(), affiliation.getClinic(), slotKey);
+
+        if (appointmentsBooked >= affiliation.getPatientLimits()) {
+            throw new IllegalStateException("Appointment slot is full. Please choose another time.");
+        }
+
+        // 4. Check for patient's double-booking
+        if (hasPatientBooked(requestDTO.getPatientId(), requestDTO.getDoctorId(), requestDTO.getClinicId(), slotKey)) {
+            throw new IllegalStateException("You already have an appointment in this slot.");
+        }
+
+        // 5. Create and save the new appointment
+        // Corrected section: Fetch the entities before building the appointment
+        PatientEntity patient = patientRepository.findById(requestDTO.getPatientId())
+                .orElseThrow(() -> new IllegalArgumentException("Patient not found."));
+
+        DoctorEntity doctor = affiliation.getDoctor();
+        ClinicEntity clinic = affiliation.getClinic();
+
+        AppointmentDetailEntity newAppointment = AppointmentDetailEntity.builder()
+                .patient(patient)
+                .doctor(doctor)
+                .clinic(clinic)
+                .appointmentDate(requestDTO.getAppointmentDate())
+                .appointmentTime(requestDTO.getAppointmentTime())
+                .appointmentTimeSlot(slotKey)
+                .reason(requestDTO.getReason())
+                .status("SCHEDULED")
+                .build();
+
+        AppointmentDetailEntity savedAppointment = appointmentRepository.save(newAppointment);
+
+        // 6. Map the saved entity to a DTO for the response
+        // The re-fetching is no longer needed since the entities are correctly attached.
+        UUID id = savedAppointment.getId();
+        LocalDate appointmentDate = savedAppointment.getAppointmentDate();
+        LocalTime appointmentTime = savedAppointment.getAppointmentTime();
+        String reason = savedAppointment.getReason();
+        String status = savedAppointment.getStatus();
+        UUID patientId = savedAppointment.getPatient().getId();
+        String patientFullName = savedAppointment.getPatient().getFirstName() + " " + savedAppointment.getPatient().getLastName();
+        UUID doctorId = savedAppointment.getDoctor().getId();
+        String doctorFullName = savedAppointment.getDoctor().getFirstName() + " " + savedAppointment.getDoctor().getLastName();
+        Set<String> doctorSpecialization = savedAppointment.getDoctor().getSpecialization();
+        UUID clinicId = savedAppointment.getClinic().getId();
+        String clinicName = savedAppointment.getClinic().getName();
+
+        return new AppointmentDTO(id, appointmentDate, appointmentTime, reason, status, patientId, patientFullName, doctorId, doctorFullName, doctorSpecialization, clinicId, clinicName);
     }
 
-    // --- Retrieval Operations ---
+    private boolean isValidShift(Map<String, String> shiftDetails, LocalDateTime appointmentTime) {
+        String dayOfWeek = appointmentTime.getDayOfWeek().name();
+        String shift = shiftDetails.get(dayOfWeek.toLowerCase());
+        if (shift == null) {
+            System.out.println(dayOfWeek);
+            System.out.println("Wrong Day");
+            return false; // Doctor is not working on this day
+        }
 
-    /**
-     * Retrieves all appointments, mapped to DTOs.
-     * @return A list of AppointmentDTO.
-     */
+        // Parse the shift string (e.g., "09:00-17:00") and check if the appointment time is within it
+        String[] times = shift.split("-");
+        LocalTime startTime = LocalTime.parse(times[0]);
+        LocalTime endTime = LocalTime.parse(times[1]);
+        LocalTime appointmentLocalTime = appointmentTime.toLocalTime();
+
+        return !(appointmentLocalTime.isBefore(startTime) || appointmentLocalTime.isAfter(endTime));
+    }
+
+    private boolean hasPatientBooked(UUID patientId, UUID doctorId, UUID clinicId, String slotKey) {
+        long existingBookings = appointmentRepository.countByPatientIdAndDoctorIdAndClinicIdAndAppointmentTimeSlot(patientId, doctorId, clinicId, slotKey);
+        return existingBookings > 0;
+    }
+
+    private String getSlotKey(LocalDateTime appointmentTime) {
+        // Format the day of the week (e.g., "Monday")
+        String day = appointmentTime.getDayOfWeek().name();
+
+        // Format the hour (e.g., "09")
+        int hour = appointmentTime.getHour();
+        String formattedHour = String.format("%02d", hour);
+
+        // Assuming one-hour slots, the minute part is always "00"
+        String formattedTime = formattedHour + ":00";
+
+        return String.format("%s_%s", day, formattedTime); // e.g., "MONDAY_09:00"
+    }
+
+    private boolean isSlotAvailable(DoctorClinicAffiliationEntity affiliation, String slotKey) {
+        // Check if the slot key exists in the patientLimits map
+        Integer patientLimit = affiliation.getPatientLimits();
+        if (patientLimit == null) {
+            return false; // Slot is not a valid working slot for the doctor
+        }
+
+        // Get the number of appointments already booked for this slot
+        long appointmentsBooked = appointmentRepository.countByDoctorAndClinicAndAppointmentTimeSlot(
+                affiliation.getDoctor(), affiliation.getClinic(), slotKey);
+
+        return appointmentsBooked < patientLimit;
+    }
+
     public List<AppointmentDTO> getAllAppointments() {
         return appointmentRepository.findAll().stream()
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .map(entity -> modelMapper.map(entity, AppointmentDTO.class))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Finds an appointment by its ID, mapped to a DTO.
-     * @param id The UUID of the appointment to search for.
-     * @return An Optional containing the AppointmentDTO if found.
-     */
-    public Optional<AppointmentDTO> getAppointmentById(UUID id) {
-        return appointmentRepository.findById(id)
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class));
-    }
+    // ... (getAppointmentById, getAppointmentsForPatient, etc. remain the same as they were already correct) ...
+    // ... (controller code also remains correct and doesn't need changes) ...
 
-    /**
-     * Finds appointments for a specific patient, mapped to DTOs.
-     * @param patientId The UUID of the patient.
-     * @return A list of AppointmentDTO for the given patient.
-     * @throws ResourceNotFoundException if the patient is not found.
-     */
-    public List<AppointmentDTO> getAppointmentsForPatient(UUID patientId) {
-        PatientEntity patient = patientService.getPatientEntityById(patientId) // Use get*EntityById helper
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + patientId));
-        return appointmentRepository.findByPatient(patient).stream()
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Finds appointments for a specific doctor, mapped to DTOs.
-     * @param doctorId The UUID of the doctor.
-     * @return A list of AppointmentDTO for the given doctor.
-     * @throws ResourceNotFoundException if the doctor is not found.
-     */
-    public List<AppointmentDTO> getAppointmentsForDoctor(UUID doctorId) {
-        DoctorEntity doctor = doctorService.getDoctorEntityById(doctorId) // Use get*EntityById helper
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + doctorId));
-        return appointmentRepository.findByDoctor(doctor).stream()
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Finds appointments for a specific clinic, mapped to DTOs.
-     * @param clinicId The UUID of the clinic.
-     * @return A list of AppointmentDTO for the given clinic.
-     * @throws ResourceNotFoundException if the clinic is not found.
-     */
-    public List<AppointmentDTO> getAppointmentsForClinic(UUID clinicId) {
-        ClinicEntity clinic = clinicService.getClinicEntityById(clinicId) // Use get*EntityById helper
-                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with ID: " + clinicId));
-        return appointmentRepository.findByClinic(clinic).stream()
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Finds appointments by status, mapped to DTOs.
-     * @param status The status to search for (e.g., "Scheduled", "Cancelled").
-     * @return A list of AppointmentDTO matching the status.
-     */
-    public List<AppointmentDTO> getAppointmentsByStatus(String status) {
-        return appointmentRepository.findByStatus(status).stream()
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Finds appointments for a specific doctor on a specific date, mapped to DTOs.
-     * @param doctorId The UUID of the doctor.
-     * @param date The date of the appointment.
-     * @return A list of AppointmentDTO for the given doctor and date.
-     * @throws ResourceNotFoundException if the doctor is not found.
-     */
-    public List<AppointmentDTO> getAppointmentsForDoctorOnDate(UUID doctorId, LocalDate date) {
-        DoctorEntity doctor = doctorService.getDoctorEntityById(doctorId) // Use get*EntityById helper
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + doctorId));
-        return appointmentRepository.findByDoctorAndAppointmentDate(doctor, date).stream()
-                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
-                .collect(Collectors.toList());
-    }
-
-    // --- Update Operation ---
-
-    /**
-     * Updates an existing appointment's details based on the provided DTO.
-     *
-     * @param id The UUID of the appointment to update.
-     * @param updateRequestDTO The DTO containing the updated appointment details.
-     * @return The updated AppointmentDTO.
-     * @throws ResourceNotFoundException if the appointment is not found.
-     * @throws BadRequestException for business rule violations during update.
-     */
     @Transactional
     public AppointmentDTO updateAppointment(UUID id, AppointmentUpdateRequestDTO updateRequestDTO) {
+        // The @EntityGraph on findById ensures all relations are loaded for the update.
         AppointmentDetailEntity appointmentToUpdate = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id: " + id));
 
-        // Note: Patient, Doctor, Clinic are typically NOT updated directly through this DTO.
-        // Changing them usually implies canceling and rescheduling a new appointment.
-        // If allowed (e.g., if DTO contains Optional<UUID> for these IDs), you'd need logic here to:
-        // 1. Check if the ID in DTO is present and different from current.
-        // 2. Fetch the new entity using get*EntityById.
-        // 3. Set the new entity on appointmentToUpdate.
-
-        // Map DTO to entity for basic fields (date, time, reason, status)
         modelMapper.map(updateRequestDTO, appointmentToUpdate);
 
-        // Update updatedAt timestamp (if present in entity)
-        // appointmentToUpdate.setUpdatedAt(LocalDateTime.now());
+        AppointmentDetailEntity updatedAppointment = appointmentRepository.save(appointmentToUpdate);
 
-        // Further validation for updates (e.g., status transitions, availability changes)
-        /*
-        // Example: If status changed to "Cancelled", add cancellation specific logic.
-        if ("Cancelled".equals(updateRequestDTO.getStatus()) && !"Cancelled".equals(appointmentToUpdate.getStatus())) {
-            // Perform cancellation specific logic, e.g., notify doctor/patient
-        }
-        // Example: Re-check availability if date/time changed
-        if (updateRequestDTO.getAppointmentDate() != null || updateRequestDTO.getAppointmentTime() != null) {
-            // Re-check doctor/clinic availability for the potentially new date/time
-            // if (!doctorService.isDoctorAvailable(appointmentToUpdate.getDoctor().getId(), appointmentToUpdate.getAppointmentDate(), appointmentToUpdate.getAppointmentTime())) {
-            //      throw new BadRequestException("Doctor is no longer available at this updated time.");
-            // }
-        }
-        */
-
-        AppointmentDetailEntity updatedAppointmentEntity = appointmentRepository.save(appointmentToUpdate);
-        return modelMapper.map(updatedAppointmentEntity, AppointmentDTO.class);
+        // No re-fetch needed here either.
+        return modelMapper.map(updatedAppointment, AppointmentDTO.class);
     }
 
-    // --- Delete Operation ---
-
-    /**
-     * Deletes an appointment by its ID.
-     *
-     * @param id The UUID of the appointment to delete.
-     * @return The AppointmentDTO of the appointment that was deleted.
-     * @throws ResourceNotFoundException if the appointment with the given ID is not found.
-     */
     @Transactional
     public AppointmentDTO deleteAppointment(UUID id) {
+        // The @EntityGraph on findById ensures the object is fully loaded before deletion
+        // so it can be returned correctly.
         AppointmentDetailEntity appointmentToDelete = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id: " + id));
 
         appointmentRepository.delete(appointmentToDelete);
 
         return modelMapper.map(appointmentToDelete, AppointmentDTO.class);
+    }
+
+    // Other service methods from your original code are correct and can be included here
+    public Optional<AppointmentDTO> getAppointmentById(UUID id) {
+        return appointmentRepository.findById(id)
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class));
+    }
+
+    public List<AppointmentDTO> getAppointmentsForPatient(UUID patientId) {
+        PatientEntity patient = patientService.getPatientEntityById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + patientId));
+        return appointmentRepository.findByPatient(patient).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentDTO> getAppointmentsForDoctor(UUID doctorId) {
+        DoctorEntity doctor = doctorService.getDoctorEntityById(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + doctorId));
+        return appointmentRepository.findByDoctor(doctor).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentDTO> getAppointmentsForClinic(UUID clinicId) {
+        ClinicEntity clinic = clinicService.getClinicEntityById(clinicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with ID: " + clinicId));
+        return appointmentRepository.findByClinic(clinic).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentDTO> getAppointmentsByStatus(String status) {
+        return appointmentRepository.findByStatus(status).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentDTO> getAppointmentsForDoctorOnDate(UUID doctorId, LocalDate date) {
+        DoctorEntity doctor = doctorService.getDoctorEntityById(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + doctorId));
+        return appointmentRepository.findByDoctorAndAppointmentDate(doctor, date).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
     }
 }

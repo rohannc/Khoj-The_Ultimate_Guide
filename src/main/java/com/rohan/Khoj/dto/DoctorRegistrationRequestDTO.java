@@ -40,13 +40,13 @@ public class DoctorRegistrationRequestDTO {
     @Pattern(regexp = "Male|Female|Other", message = "Gender must be 'Male', 'Female', or 'Other'")
     private String gender;
 
-    @NotBlank(message = "Specialization cannot be blank")
+    @NotEmpty(message = "Specialization cannot be blank")
     @Size(max = 255, message = "Specialization too long")
-    private String specialization;
+    private Set<String> specialization;
 
-    @NotBlank(message = "Qualifications cannot be blank")
+    @NotEmpty(message = "Qualifications cannot be blank")
     @Size(max = 500, message = "Qualifications too long")
-    private String qualifications;
+    private Set<String> qualifications;
 
     @NotBlank(message = "Registration number cannot be blank")
     @Size(max = 50, message = "Registration number too long")

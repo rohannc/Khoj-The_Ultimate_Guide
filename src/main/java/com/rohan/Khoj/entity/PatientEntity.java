@@ -66,7 +66,7 @@ public class PatientEntity extends BaseUserEntity {
         return UserType.PATIENT; // Or DOCTOR, CLINIC as appropriate
     }
 
-    @OneToMany(mappedBy = "patient", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "patient", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference("patient-appointments") // This side will be serialized
     private Set<AppointmentDetailEntity> appointments;
 

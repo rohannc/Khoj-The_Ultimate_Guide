@@ -33,7 +33,7 @@ public class DoctorEntity extends BaseUserEntity {
     @Column(name = "gender", length = 10)
     private String gender;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "doctor_phone_numbers", joinColumns = @JoinColumn(name = "doctor_id"))
     @Column(name = "phone_number", nullable = false, length = 20)
     private Set<String> phoneNumbers;
@@ -45,13 +45,13 @@ public class DoctorEntity extends BaseUserEntity {
     private LocalDate registrationIssueDate;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "doctor_specializations", joinColumns = @JoinColumn(name = "doctor_id"))
+    @CollectionTable(name = "doctor_specialization", joinColumns = @JoinColumn(name = "doctor_id"))
     @Column(name = "specialization", nullable = false, length = 100)
-    private Set<String> specializations;
+    private Set<String> specialization;
 
-    @ElementCollection(fetch = FetchType.LAZY)
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "doctor_qualifications", joinColumns = @JoinColumn(name = "doctor_id"))
-    @Column(name = "qualification", nullable = false, length = 100)
+    @Column(name = "qualifications", nullable = false, length = 100)
     private Set<String> qualifications;
 
     @Transient
@@ -76,7 +76,7 @@ public class DoctorEntity extends BaseUserEntity {
     @JsonManagedReference("doctor-affiliations") // This side will be serialized
     private Set<DoctorClinicAffiliationEntity> clinicAffiliations;
 
-    @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference("doctor-appointments") // This side will be serialized
     private Set<AppointmentDetailEntity> appointments;
 

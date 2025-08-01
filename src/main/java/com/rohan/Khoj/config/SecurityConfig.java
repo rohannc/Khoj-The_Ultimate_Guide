@@ -39,39 +39,28 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/api/clinics",          // Publicly viewable list of all clinics
-                                "/api/clinics/{id}",     // Publicly viewable specific clinic
-                                "/api/clinics/by-name",
-                                "/api/clinics/by-city",
-                                "/api/clinics/by-pin-code",
-                                "/api/clinics/by-email/{emailId}",
-                                "/api/doctors",          // Publicly viewable list of all doctors
-                                "/api/doctors/{id}",     // Publicly viewable specific doctor
-                                "/api/doctors/by-username/{username}",
-                                "/api/doctors/by-email/{emailId}",
-                                "/api/doctors/by-specialization",
-                                "/api/doctors/by-last-name"
+                                "/api/clinics/**",       // All clinic read-only paths
+                                "/api/doctors/**"        // All doctor read-only paths
                         ).permitAll()
 
                         // --- Role-Based Authorization Rules ---
                         // Patients can view/update their own profile and manage their appointments
                         .requestMatchers(
-                                "/api/patients/{id}/**", // Can access specific patient profile paths
-                                "/api/appointments/**"   // Can access all appointment paths
-                        ).hasAnyAuthority(Role.ROLE_PATIENT.name()) // Only PATIENT role
+                                "/api/patients/{id}/**",
+                                "/api/appointments/**"
+                        ).hasAnyAuthority(Role.ROLE_PATIENT.name())
 
-                        // Doctors can view/update their own profile and manage affiliations
+                        // Doctors can manage their own profile and affiliations
                         .requestMatchers(
-                                "/api/doctors/{id}/**", // Can access specific doctor profile paths
-                                "/api/doctors/affiliations/**", // All affiliation paths
-                                "/api/doctors/{doctorId}/affiliations/clinic/{clinicId}",
-                                "/api/doctors/{doctorId}/clinics"
-                        ).hasAnyAuthority(Role.ROLE_DOCTOR.name()) // Only DOCTOR role
+                                "/api/doctor/affiliations/**",
+                                "/api/doctors/{id}/**"
+                        ).hasAnyAuthority(Role.ROLE_DOCTOR.name())
 
-                        // Clinics can view/update their own profile and potentially manage doctors
+                        // Clinics can manage their own profile and affiliations
                         .requestMatchers(
-                                "/api/clinics/{id}/**" // Can access specific clinic profile paths
-                        ).hasAnyAuthority(Role.ROLE_CLINIC.name()) // Only CLINIC role
+                                "/api/clinic/affiliations/**",
+                                "/api/clinics/{id}/**"
+                        ).hasAnyAuthority(Role.ROLE_CLINIC.name())
 
                         // All other requests require authentication
                         .anyRequest().authenticated()
@@ -83,7 +72,6 @@ public class SecurityConfig {
     }
 
     // Configures the Authentication Provider (DaoAuthenticationProvider)
-    // It uses our UserDetailsService to load user details and PasswordEncoder to verify passwords.
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
@@ -93,14 +81,12 @@ public class SecurityConfig {
     }
 
     // Provides the PasswordEncoder bean for hashing passwords (e.g., BCrypt)
-    // This should be the same encoder used during user registration.
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Exposes the AuthenticationManager bean. This is used in the login endpoint
-    // to programmatically authenticate users.
+    // Exposes the AuthenticationManager bean.
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();

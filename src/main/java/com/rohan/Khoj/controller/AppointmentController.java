@@ -37,6 +37,7 @@ public class AppointmentController {
     public ResponseEntity<AppointmentDTO> scheduleAppointment(@Valid @RequestBody AppointmentRequestDTO request) {
         try {
             AppointmentDTO scheduledAppointment = appointmentService.scheduleAppointment(request);
+
             return new ResponseEntity<>(scheduledAppointment, HttpStatus.CREATED);
         } catch (ResourceNotFoundException | ConflictException e) {
             throw e; // Let @ResponseStatus handle 404/409

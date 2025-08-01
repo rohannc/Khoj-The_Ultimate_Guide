@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Set;
 import java.util.UUID;
 
 @Data
@@ -18,20 +19,16 @@ public class AppointmentDTO {
     private LocalDate appointmentDate;
     private LocalTime appointmentTime;
     private String reason;
-    private String status; // e.g., Scheduled, Confirmed, Cancelled, Completed
+    private String status;
 
-    // Simplified representation of related entities
     private UUID patientId;
-    private String patientFullName; // e.g., Patient's first name + last name
+    private String patientFullName;
 
     private UUID doctorId;
-    private String doctorFullName; // e.g., Doctor's first name + last name
-    private String doctorSpecialization; // Assuming DoctorEntity has specialization
+    private String doctorFullName;
+    // Included doctor's specialization in the response DTO
+    private Set<String> doctorSpecialization;
 
     private UUID clinicId;
-    private String clinicName; // Assuming ClinicEntity has name
-
-    // Add createdAt, updatedAt if your AppointmentDetailEntity has them and you want to expose
-    // private LocalDateTime createdAt;
-    // private LocalDateTime updatedAt;
+    private String clinicName;
 }

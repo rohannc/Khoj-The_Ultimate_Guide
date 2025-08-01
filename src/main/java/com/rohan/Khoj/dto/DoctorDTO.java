@@ -23,8 +23,8 @@ public class DoctorDTO {
     private String firstName;
     private String lastName;
     private String gender;
-    private String specialization;
-    private String qualifications;
+    private Set<String> specialization;
+    private Set<String> qualifications;
     private Integer experienceYears;
     private String registrationNumber;
 
