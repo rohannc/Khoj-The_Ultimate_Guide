@@ -40,7 +40,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/api/clinics/**",       // All clinic read-only paths
-                                "/api/doctors/**"        // All doctor read-only paths
+                                "/api/doctors/**",       // All doctor read-only paths
+                                "/docs"
                         ).permitAll()
 
                         // --- Role-Based Authorization Rules ---

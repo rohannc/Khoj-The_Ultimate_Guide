@@ -4,11 +4,11 @@ import com.rohan.Khoj.dto.ClinicRegistrationRequestDTO;
 import com.rohan.Khoj.dto.DoctorRegistrationRequestDTO;
 import com.rohan.Khoj.dto.PatientRegistrationRequestDTO;
 import com.rohan.Khoj.dto.RegistrationResponseDTO;
-import com.rohan.Khoj.entity.UserType; // Ensure this enum is correctly defined
 import com.rohan.Khoj.service.ClinicRegistrationService;
 import com.rohan.Khoj.service.DoctorRegistrationService;
 import com.rohan.Khoj.service.PatientRegistrationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,32 +28,21 @@ public class RegistrationController {
     private final ClinicRegistrationService clinicRegistrationService;
 
     /**
-     * Handles the registration of a new patient.
-     * Validates the incoming request DTO and delegates to the patient registration service.
+     * Handles the registration request for a new patient.
+     * The method is now much cleaner, as exception handling is delegated
+     * to the GlobalExceptionHandler.
      *
-     * @param request The PatientRegistrationRequestDTO containing patient details.
-     * @return ResponseEntity with RegistrationResponseDTO and appropriate HTTP status.
+     * @param request The patient registration data, validated.
+     * @return A ResponseEntity with the success response DTO and a 201 CREATED status.
      */
     @PostMapping("/register/patient")
     public ResponseEntity<RegistrationResponseDTO> registerPatient(@Valid @RequestBody PatientRegistrationRequestDTO request) {
-        try {
-            // The service method is expected to return RegistrationResponseDTO directly
-            RegistrationResponseDTO response = patientRegistrationService.registerPatient(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
-            // Catch specific business rule violations (e.g., username/email already exists)
-            System.err.println("Conflict during patient registration: " + e.getMessage()); // Log for server-side
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(
-                    RegistrationResponseDTO.builder().message(e.getMessage()).build()
-            );
-        } catch (Exception e) {
-            // Catch any other unexpected errors from the service or deeper layers
-            System.err.println("Unexpected error during patient registration: " + e.getMessage());
-            e.printStackTrace(); // Log the full stack trace for debugging purposes in a real application
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    RegistrationResponseDTO.builder().message("An unexpected error occurred during patient registration. Please try again later.").build()
-            );
-        }
+        // The service method is called directly.
+        // If it succeeds, it returns the response DTO.
+        // If it fails (e.g., duplicate user), it throws an exception which is
+        // caught by the GlobalExceptionHandler, which then sends the appropriate error JSON.
+        RegistrationResponseDTO response = patientRegistrationService.registerPatient(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**

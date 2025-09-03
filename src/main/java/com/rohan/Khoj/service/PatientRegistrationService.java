@@ -2,10 +2,10 @@ package com.rohan.Khoj.service;
 
 import com.rohan.Khoj.dto.PatientRegistrationRequestDTO;
 import com.rohan.Khoj.dto.RegistrationResponseDTO;
-import com.rohan.Khoj.dto.MobileNumberWrapperDTO; // Import wrapper DTO
 import com.rohan.Khoj.entity.PatientEntity;
 import com.rohan.Khoj.entity.Role;
-import com.rohan.Khoj.entity.UserType; // Assuming you have this enum
+import com.rohan.Khoj.entity.UserType;
+import com.rohan.Khoj.customException.UserAlreadyExistsException; // Import the custom exception
 import com.rohan.Khoj.repository.PatientRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,9 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet; // For initializing collections
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.HashSet;
 
 @Service
 public class PatientRegistrationService {
@@ -34,48 +32,34 @@ public class PatientRegistrationService {
 
     @Transactional
     public RegistrationResponseDTO registerPatient(PatientRegistrationRequestDTO request) {
-        // 1. Validate for uniqueness before mapping (optional, but can give earlier feedback)
+        // 1. Validate for uniqueness. Throw a specific exception if a user exists.
         if (patientRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new IllegalArgumentException("Username '" + request.getUsername() + "' is already taken.");
+            throw new UserAlreadyExistsException("Username '" + request.getUsername() + "' is already taken.");
         }
         if (patientRepository.existsByEmailId(request.getEmailId())) {
-            throw new IllegalArgumentException("Email '" + request.getEmailId() + "' is already registered.");
+            throw new UserAlreadyExistsException("Email '" + request.getEmailId() + "' is already registered.");
         }
 
         // 2. Map DTO to Entity
-        // ModelMapper will handle direct field mapping and the phoneNumbers conversion
         PatientEntity newPatient = modelMapper.map(request, PatientEntity.class);
 
-        // 3. Handle password hashing (CRITICAL security step)
+        // 3. Handle password hashing
         newPatient.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        // 4. Set system-generated fields (if not handled by @PrePersist in BaseUserEntity)
-        if (newPatient.getCreatedAt() == null) {
-            newPatient.setCreatedAt(LocalDateTime.now());
-        }
+        // 4. Set system-generated fields
+        newPatient.setCreatedAt(LocalDateTime.now());
+        newPatient.setUpdatedAt(newPatient.getCreatedAt());
+        newPatient.setRole(Role.ROLE_PATIENT);
+        newPatient.setPhoneNumbers(new HashSet<>()); // Ensure collection is initialized
 
-        if (newPatient.getUpdatedAt() == null) {
-            newPatient.setUpdatedAt(newPatient.getCreatedAt());
-        }
-
-        if (newPatient.getRole() == null) {
-            newPatient.setRole(Role.ROLE_PATIENT);
-        }
-
-        // Ensure phoneNumbers set is initialized if not done by SuperBuilder/Lombok
-        if (newPatient.getPhoneNumbers() == null) {
-            newPatient.setPhoneNumbers(new HashSet<>());
-        }
-
-
-        // 5. Save the Entity to the database
+        // 5. Save the Entity
         PatientEntity savedPatient = patientRepository.save(newPatient);
 
-        // 6. Map the saved Entity to the RegistrationResponseDTO
+        // 6. Map the saved Entity to the success response DTO
         return RegistrationResponseDTO.builder()
                 .message("Patient registered successfully!")
-                .id(savedPatient.getId()) // Use 'id' from the saved entity
-                .username(savedPatient.getUsername()) // Use 'username' from the saved entity
+                .id(savedPatient.getId())
+                .username(savedPatient.getUsername())
                 .registeredUserType(UserType.PATIENT)
                 .build();
     }
