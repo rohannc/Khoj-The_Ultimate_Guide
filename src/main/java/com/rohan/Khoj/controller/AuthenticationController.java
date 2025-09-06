@@ -1,7 +1,7 @@
 package com.rohan.Khoj.controller;
 
-import com.rohan.Khoj.dto.AuthRequestDTO;
-import com.rohan.Khoj.dto.AuthResponseDTO;
+import com.rohan.Khoj.dto.authentication.AuthRequestDTO;
+import com.rohan.Khoj.dto.authentication.AuthResponseDTO;
 import com.rohan.Khoj.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

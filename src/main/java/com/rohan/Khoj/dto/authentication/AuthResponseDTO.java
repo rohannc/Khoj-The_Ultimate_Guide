@@ -1,4 +1,4 @@
-package com.rohan.Khoj.dto;
+package com.rohan.Khoj.dto.authentication;
 
 import com.rohan.Khoj.entity.UserType;
 import lombok.AllArgsConstructor;

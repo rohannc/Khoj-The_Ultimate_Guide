@@ -1,4 +1,4 @@
-package com.rohan.Khoj.dto;
+package com.rohan.Khoj.dto.authentication;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

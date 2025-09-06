@@ -1,12 +1,12 @@
 package com.rohan.Khoj.service;
 
-// Removed unused imports: ClinicModelMapperConfig, Autowired
+import com.rohan.Khoj.customException.BadRequestException;
 import com.rohan.Khoj.customException.ConflictException;
 import com.rohan.Khoj.customException.ResourceNotFoundException;
-import com.rohan.Khoj.dto.DoctorDTO; // Response DTO
-import com.rohan.Khoj.dto.DoctorUpdateRequestDTO; // Request DTO
+import com.rohan.Khoj.dto.DoctorDTO;
+import com.rohan.Khoj.dto.DoctorUpdateRequestDTO;
+import com.rohan.Khoj.dto.update.PasswordUpdateRequestDTO;
 import com.rohan.Khoj.entity.DoctorEntity;
-import com.rohan.Khoj.repository.DoctorClinicAffiliationRepository;
 import com.rohan.Khoj.repository.DoctorRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -14,7 +14,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -23,153 +22,109 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // Default for service methods
+@Transactional(readOnly = true) // Default for all read operations
 public class DoctorService {
 
     private final DoctorRepository doctorRepository;
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
-    private final DoctorClinicAffiliationRepository affiliationRepository; // Injected via constructor
-    private final ClinicService clinicService; // Injected via constructor
 
-    // --- Update Operation ---
+    // --- Update Operations ---
 
     /**
-     * Updates an existing doctor's details based on the provided DTO.
-     * Handles uniqueness checks for username, email, and medical license number, and password hashing.
+     * Updates an existing doctor's profile details.
+     * Password updates are handled by a separate, dedicated method.
      *
      * @param id The UUID of the doctor to update.
-     * @param updateRequestDTO The DTO containing the updated doctor details.
-     * @return The updated DoctorDto.
-     * @throws ResourceNotFoundException if the doctor with the given ID is not found.
-     * @throws ConflictException if username, email, or medical license number update conflicts with an existing user.
+     * @param updateRequestDTO The DTO with new profile data.
+     * @return The updated DoctorDTO.
+     * @throws ResourceNotFoundException if the doctor is not found.
+     * @throws ConflictException if the new username or email is already taken.
      */
-    @Transactional // This operation modifies data
+    @Transactional
     public DoctorDTO updateDoctor(UUID id, DoctorUpdateRequestDTO updateRequestDTO) {
         DoctorEntity doctorToUpdate = doctorRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + id));
 
         // --- Handle Username Update ---
         if (updateRequestDTO.getUsername() != null && !updateRequestDTO.getUsername().equals(doctorToUpdate.getUsername())) {
-            Optional<DoctorEntity> existingDoctorWithNewUsername = doctorRepository.findByUsername(updateRequestDTO.getUsername());
-            if (existingDoctorWithNewUsername.isPresent() && !existingDoctorWithNewUsername.get().getId().equals(id)) {
-                throw new ConflictException("Username '" + updateRequestDTO.getUsername() + "' is already taken by another doctor.");
+            if (doctorRepository.findByUsername(updateRequestDTO.getUsername()).isPresent()) {
+                throw new ConflictException("Username '" + updateRequestDTO.getUsername() + "' is already taken.");
             }
             doctorToUpdate.setUsername(updateRequestDTO.getUsername());
         }
 
         // --- Handle Email Update ---
         if (updateRequestDTO.getEmail() != null && !updateRequestDTO.getEmail().equals(doctorToUpdate.getEmailId())) {
-            // Ensure DoctorRepository has 'Optional<DoctorEntity> findByEmailId(String emailId);'
-            Optional<DoctorEntity> existingDoctorWithNewEmail = doctorRepository.findByEmailId(updateRequestDTO.getEmail());
-            if (existingDoctorWithNewEmail.isPresent() && !existingDoctorWithNewEmail.get().getId().equals(id)) {
-                throw new ConflictException("Email '" + updateRequestDTO.getEmail() + "' is already in use by another doctor.");
+            if (doctorRepository.findByEmailId(updateRequestDTO.getEmail()).isPresent()) {
+                throw new ConflictException("Email '" + updateRequestDTO.getEmail() + "' is already in use.");
             }
             doctorToUpdate.setEmailId(updateRequestDTO.getEmail());
         }
 
-        // --- Handle Password Update ---
-        if (updateRequestDTO.getPassword() != null && !updateRequestDTO.getPassword().isEmpty()) {
-            doctorToUpdate.setPassword(passwordEncoder.encode(updateRequestDTO.getPassword())); // Corrected method name
-        }
-
-        // --- Handle Medical License Number Update ---
-        // Assuming DoctorEntity's field name is 'medicalLicenseNumber' as in DTO
-        if (updateRequestDTO.getRegistrationNumber() != null && !updateRequestDTO.getRegistrationNumber().equals(doctorToUpdate.getRegistrationNumber())) {
-            Optional<DoctorEntity> existingDoctorWithNewLicense = doctorRepository.findByRegistrationNumber(updateRequestDTO.getRegistrationNumber());
-            if (existingDoctorWithNewLicense.isPresent() && !existingDoctorWithNewLicense.get().getId().equals(id)) {
-                throw new ConflictException("Medical license number '" + updateRequestDTO.getRegistrationNumber() + "' is already registered to another doctor.");
-            }
-            doctorToUpdate.setRegistrationNumber(updateRequestDTO.getRegistrationNumber()); // Corrected method name
-        }
-
-        // --- Map other fields using ModelMapper ---
+        // --- Map other non-sensitive fields ---
         modelMapper.map(updateRequestDTO, doctorToUpdate);
 
-        // Update updatedAt timestamp
         doctorToUpdate.setUpdatedAt(LocalDateTime.now());
+        DoctorEntity updatedDoctor = doctorRepository.save(doctorToUpdate);
 
-        // Save the updated entity
-        DoctorEntity updatedDoctorEntity = doctorRepository.save(doctorToUpdate);
-
-        // Map the saved entity back to a DTO for the response
-        return modelMapper.map(updatedDoctorEntity, DoctorDTO.class);
+        return modelMapper.map(updatedDoctor, DoctorDTO.class);
     }
 
-    // --- Retrieval Operations (Returning DTOs) ---
-
     /**
-     * Finds a doctor by their username.
-     * @param username The username to search for.
-     * @return An Optional containing the DoctorDto if found.
-     */
-    public Optional<DoctorDTO> getDoctorByUsername(String username) { // Renamed for consistency
-        return doctorRepository.findByUsername(username)
-                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class));
-    }
-
-    // Add this helper method for internal service use
-    /**
-     * Finds a DoctorEntity by its ID. Used internally by other services when the entity itself is needed.
+     * Updates the password for a specific doctor after verifying the current one.
      *
      * @param id The UUID of the doctor.
-     * @return An Optional containing the DoctorEntity if found.
+     * @param passwordRequest The DTO containing the current and new passwords.
+     * @throws ResourceNotFoundException if the doctor is not found.
+     * @throws BadRequestException if the current password is incorrect.
      */
-    public Optional<DoctorEntity> getDoctorEntityById(UUID id) {
-        return doctorRepository.findById(id);
+    @Transactional
+    public void updatePassword(UUID id, PasswordUpdateRequestDTO passwordRequest) {
+        DoctorEntity doctorToUpdate = doctorRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + id));
+
+        if (!passwordEncoder.matches(passwordRequest.getCurrentPassword(), doctorToUpdate.getPassword())) {
+            throw new BadRequestException("Incorrect current password.");
+        }
+
+        doctorToUpdate.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
+        doctorToUpdate.setUpdatedAt(LocalDateTime.now());
+        doctorRepository.save(doctorToUpdate);
     }
 
-    /**
-     * Retrieves all doctors, mapped to DTOs.
-     * @return A list of DoctorDto.
-     */
+    // --- Retrieval Operations ---
+
     public List<DoctorDTO> getAllDoctors() {
         return doctorRepository.findAll().stream()
-                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Finds a doctor by their ID, mapped to a DTO.
-     * @param id The UUID of the doctor to search for.
-     * @return An Optional containing the DoctorDto if found.
-     */
     public Optional<DoctorDTO> getDoctorById(UUID id) {
         return doctorRepository.findById(id)
-                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class));
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class));
     }
 
-    /**
-     * Finds a doctor by their email ID, mapped to a DTO.
-     * @param emailId The email ID to search for.
-     * @return An Optional containing the DoctorDto if found.
-     */
-    public Optional<DoctorDTO> getDoctorByEmail(String emailId) { // Renamed for consistency
-        return doctorRepository.findByEmailId(emailId)
-                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class));
+    public Optional<DoctorDTO> getDoctorByUsername(String username) {
+        return doctorRepository.findByUsername(username)
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class));
     }
 
-    /**
-     * Finds doctors by specialization, mapped to DTOs.
-     * @param specialization The specialization to search for.
-     * @return A list of DoctorDto.
-     */
+    public Optional<DoctorDTO> getDoctorByEmail(String email) {
+        return doctorRepository.findByEmailId(email)
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class));
+    }
+
     public List<DoctorDTO> getDoctorsBySpecialization(String specialization) {
-        // Assuming findBySpecializationsContaining is a correct repository method for a string
-        return doctorRepository.findBySpecializationContaining(specialization).stream()
-                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
+        return doctorRepository.findBySpecializationContainingIgnoreCase(specialization).stream()
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Finds doctors by last name, mapped to DTOs.
-     * @param lastName The last name to search for.
-     * @return A list of DoctorDto.
-     */
     public List<DoctorDTO> getDoctorsByLastName(String lastName) {
-        // Assuming findByLastNameContaining is a correct repository method for a string
-        return doctorRepository.findByLastNameContaining(lastName).stream()
-                .map(doctorEntity -> modelMapper.map(doctorEntity, DoctorDTO.class))
+        return doctorRepository.findByLastNameContainingIgnoreCase(lastName).stream()
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class))
                 .collect(Collectors.toList());
     }
 
@@ -177,18 +132,15 @@ public class DoctorService {
 
     /**
      * Deletes a doctor by their ID.
+     *
      * @param id The UUID of the doctor to delete.
-     * @return The DoctorDto of the doctor that was deleted.
-     * @throws ResourceNotFoundException if the doctor with the given ID is not found.
+     * @throws ResourceNotFoundException if the doctor is not found.
      */
-    @Transactional // This operation modifies data
-    public DoctorDTO deleteDoctor(UUID id) {
-        DoctorEntity doctorToDelete = doctorRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + id));
-
-        doctorRepository.delete(doctorToDelete); // Use delete(entity) for fewer queries
-
-        return modelMapper.map(doctorToDelete, DoctorDTO.class); // Return the DTO of the deleted doctor
+    @Transactional
+    public void deleteDoctor(UUID id) {
+        if (!doctorRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Doctor not found with id: " + id);
+        }
+        doctorRepository.deleteById(id);
     }
-
 }

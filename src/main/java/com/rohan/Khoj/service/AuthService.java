@@ -1,7 +1,7 @@
 package com.rohan.Khoj.service;
 
-import com.rohan.Khoj.dto.AuthRequestDTO;
-import com.rohan.Khoj.dto.AuthResponseDTO;
+import com.rohan.Khoj.dto.authentication.AuthRequestDTO;
+import com.rohan.Khoj.dto.authentication.AuthResponseDTO;
 import com.rohan.Khoj.entity.BaseUserEntity; // To cast UserDetails to get specific type information
 import com.rohan.Khoj.entity.UserType; // Assuming UserType enum exists
 import com.rohan.Khoj.jwt.JwtService;

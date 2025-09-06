@@ -31,4 +31,7 @@ public interface DoctorRepository extends JpaRepository<DoctorEntity, UUID> {
     // Custom query method: Check if a doctor with a given email ID already exists
     boolean existsByEmailId(String emailId);
 
+    Optional<Object> findBySpecializationContainingIgnoreCase(String specialization);
+
+    Optional<Object> findByLastNameContainingIgnoreCase(String lastName);
 }

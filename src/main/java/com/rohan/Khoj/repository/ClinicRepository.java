@@ -28,4 +28,6 @@ public interface ClinicRepository extends JpaRepository<ClinicEntity, UUID> {
     boolean existsByEmailId(String emailId);
 
     Optional<ClinicEntity> findByEmailId(@Email(message = "Invalid email format") @Size(max = 255, message = "Email too long") String email);
+
+    Optional<Object> findByCityContainingIgnoreCase(String city);
 }

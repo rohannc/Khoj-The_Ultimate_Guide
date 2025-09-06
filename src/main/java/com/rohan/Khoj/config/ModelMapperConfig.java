@@ -4,6 +4,9 @@ import com.rohan.Khoj.dto.*; // Import all DTOs (e.g., PatientDto, DoctorDto, Cl
 // Explicit imports for inner classes (MobileNumberWrapperDto) for clarity in converters
 import com.rohan.Khoj.dto.MobileNumberWrapperDTO;
 
+import com.rohan.Khoj.dto.registration.ClinicRegistrationRequestDTO;
+import com.rohan.Khoj.dto.registration.DoctorRegistrationRequestDTO;
+import com.rohan.Khoj.dto.registration.PatientRegistrationRequestDTO;
 import com.rohan.Khoj.entity.*; // Import all Entities (e.g., PatientEntity, DoctorEntity, ClinicEntity, AppointmentDetailEntity, DoctorClinicAffiliationEntity)
 import org.modelmapper.ModelMapper;
 import org.modelmapper.PropertyMap;

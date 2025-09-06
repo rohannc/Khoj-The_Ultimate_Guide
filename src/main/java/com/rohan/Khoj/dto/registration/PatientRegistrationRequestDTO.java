@@ -1,5 +1,6 @@
-package com.rohan.Khoj.dto;
+package com.rohan.Khoj.dto.registration;
 
+import com.rohan.Khoj.dto.MobileNumberWrapperDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

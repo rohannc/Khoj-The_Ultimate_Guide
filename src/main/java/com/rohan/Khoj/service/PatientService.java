@@ -1,10 +1,11 @@
 package com.rohan.Khoj.service;
 
-// Removed unused imports: DoctorEntity, DoctorRepository, ClinicModelMapperConfig, Autowired
+import com.rohan.Khoj.customException.BadRequestException;
 import com.rohan.Khoj.customException.ConflictException;
 import com.rohan.Khoj.customException.ResourceNotFoundException;
-import com.rohan.Khoj.dto.PatientDTO; // Corrected DTO name to PatientDto for response
+import com.rohan.Khoj.dto.PatientDTO;
 import com.rohan.Khoj.dto.PatientUpdateRequestDTO;
+import com.rohan.Khoj.dto.update.PasswordUpdateRequestDTO;
 import com.rohan.Khoj.entity.PatientEntity;
 import com.rohan.Khoj.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors; // For stream operations
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +29,11 @@ public class PatientService {
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
 
-    // --- Update Operation ---
+    // --- Update Operations ---
 
     /**
      * Updates an existing patient's details based on the provided DTO.
-     * Handles uniqueness checks for username and email, and password hashing.
+     * Handles uniqueness checks for username and email. Password updates are handled separately.
      *
      * @param id The UUID of the patient to update.
      * @param updateRequestDTO The DTO containing the updated patient details.
@@ -56,7 +57,6 @@ public class PatientService {
 
         // --- Handle Email Update ---
         if (updateRequestDTO.getEmail() != null && !updateRequestDTO.getEmail().equals(patientToUpdate.getEmailId())) {
-            // Ensure PatientRepository has 'Optional<PatientEntity> findByEmailId(String emailId);'
             Optional<PatientEntity> existingPatientWithNewEmail = patientRepository.findByEmailId(updateRequestDTO.getEmail());
             if (existingPatientWithNewEmail.isPresent() && !existingPatientWithNewEmail.get().getId().equals(id)) {
                 throw new ConflictException("Email '" + updateRequestDTO.getEmail() + "' is already in use by another patient.");
@@ -64,12 +64,7 @@ public class PatientService {
             patientToUpdate.setEmailId(updateRequestDTO.getEmail());
         }
 
-        // --- Handle Password Update ---
-        if (updateRequestDTO.getPassword() != null && !updateRequestDTO.getPassword().isEmpty()) {
-            patientToUpdate.setPassword(passwordEncoder.encode(updateRequestDTO.getPassword())); // Corrected method name
-        }
-
-        // --- Map other fields using ModelMapper ---
+        // --- Map other fields using ModelMapper (Password is explicitly excluded) ---
         modelMapper.map(updateRequestDTO, patientToUpdate);
 
         // Update updatedAt timestamp
@@ -82,6 +77,35 @@ public class PatientService {
         return modelMapper.map(updatedPatientEntity, PatientDTO.class);
     }
 
+    /**
+     * Updates the password for a specific patient.
+     * Verifies the current password before setting the new one.
+     *
+     * @param id The UUID of the patient.
+     * @param passwordRequest The DTO containing the current and new passwords.
+     * @throws ResourceNotFoundException if the patient is not found.
+     * @throws BadRequestException if the current password does not match.
+     */
+    @Transactional
+    public void updatePassword(UUID id, PasswordUpdateRequestDTO passwordRequest) {
+        PatientEntity patientToUpdate = patientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id: " + id));
+
+        // 1. Verify the current password
+        if (!passwordEncoder.matches(passwordRequest.getCurrentPassword(), patientToUpdate.getPassword())) {
+            throw new BadRequestException("Incorrect current password.");
+        }
+
+        // 2. Encode and set the new password
+        patientToUpdate.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
+
+        // 3. Update timestamp
+        patientToUpdate.setUpdatedAt(LocalDateTime.now());
+
+        // 4. Save the entity
+        patientRepository.save(patientToUpdate);
+    }
+
     // --- Retrieval Operations (Returning DTOs) ---
 
     /**
@@ -90,19 +114,9 @@ public class PatientService {
      * @param username The username to search for.
      * @return An Optional containing the PatientDto if found.
      */
-    public Optional<PatientDTO> getPatientByUsername(String username) { // Renamed from findByPatientname
+    public Optional<PatientDTO> getPatientByUsername(String username) {
         return patientRepository.findByUsername(username)
                 .map(patientEntity -> modelMapper.map(patientEntity, PatientDTO.class));
-    }
-
-    /**
-     * Finds a PatientEntity by its ID. Used internally by other services when the entity itself is needed.
-     *
-     * @param id The UUID of the patient.
-     * @return An Optional containing the PatientEntity if found.
-     */
-    public Optional<PatientEntity> getPatientEntityById(UUID id) {
-        return patientRepository.findById(id);
     }
 
     /**
@@ -168,19 +182,13 @@ public class PatientService {
      * Deletes a patient by their ID.
      *
      * @param id The UUID of the patient to delete.
-     * @return The PatientDto of the patient that was deleted.
      * @throws ResourceNotFoundException if the patient with the given ID is not found.
      */
     @Transactional // This operation modifies data
-    public PatientDTO deletePatient(UUID id) {
-        PatientEntity patientToDelete = patientRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id: " + id));
-
-        patientRepository.delete(patientToDelete); // Use delete(entity) for fewer queries
-
-        return modelMapper.map(patientToDelete, PatientDTO.class); // Return the DTO of the deleted patient
+    public void deletePatient(UUID id) {
+        if (!patientRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Patient not found with id: " + id);
+        }
+        patientRepository.deleteById(id);
     }
-
-    // Note: The initial 'registerPatient' method is handled by PatientRegistrationService.
-    // This PatientService focuses on post-registration CRUD and retrieval.
 }

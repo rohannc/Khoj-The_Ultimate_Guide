@@ -1,9 +1,8 @@
 package com.rohan.Khoj.service;
 
 // Corrected DTO imports
-import com.rohan.Khoj.dto.ClinicRegistrationRequestDTO;
-import com.rohan.Khoj.dto.RegistrationResponseDTO;
-import com.rohan.Khoj.dto.MobileNumberWrapperDTO; // Import wrapper DTO
+import com.rohan.Khoj.dto.registration.ClinicRegistrationRequestDTO;
+import com.rohan.Khoj.dto.registration.RegistrationResponseDTO;
 import com.rohan.Khoj.entity.ClinicEntity;
 import com.rohan.Khoj.entity.Role; // Assuming this enum is defined
 import com.rohan.Khoj.entity.UserType; // Assuming this enum is defined
@@ -17,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.HashMap;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
