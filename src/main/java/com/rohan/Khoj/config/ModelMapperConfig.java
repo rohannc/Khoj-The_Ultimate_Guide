@@ -1,13 +1,13 @@
 package com.rohan.Khoj.config;
 
-import com.rohan.Khoj.dto.*; // Import all DTOs (e.g., PatientDto, DoctorDto, ClinicDto, AppointmentDto, Request/Update DTOs, Affiliation DTOs)
-// Explicit imports for inner classes (MobileNumberWrapperDto) for clarity in converters
-import com.rohan.Khoj.dto.MobileNumberWrapperDTO;
+ // Import all DTOs (e.g., PatientDTO, DoctorDTO, ClinicDTO, AppointmentDTO, Request/Update DTOs, Affiliation DTOs)
+// Explicit imports for inner classes (MobileNumberWrapperDTO) for clarity in converters
+import com.rohan.Khoj.common.MobileNumberWrapperDTO;
 
-import com.rohan.Khoj.dto.registration.ClinicRegistrationRequestDTO;
-import com.rohan.Khoj.dto.registration.DoctorRegistrationRequestDTO;
-import com.rohan.Khoj.dto.registration.PatientRegistrationRequestDTO;
-import com.rohan.Khoj.entity.*; // Import all Entities (e.g., PatientEntity, DoctorEntity, ClinicEntity, AppointmentDetailEntity, DoctorClinicAffiliationEntity)
+import com.rohan.Khoj.auth.ClinicRegistrationRequestDTO;
+import com.rohan.Khoj.auth.DoctorRegistrationRequestDTO;
+import com.rohan.Khoj.auth.PatientRegistrationRequestDTO;
+ // Import all Entities (e.g., PatientEntity, DoctorEntity, ClinicEntity, AppointmentDetailEntity, DoctorClinicAffiliationEntity)
 import org.modelmapper.ModelMapper;
 import org.modelmapper.PropertyMap;
 import org.modelmapper.Converter; // Import Converter
@@ -20,6 +20,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.rohan.Khoj.patient.PatientUpdateRequestDTO;
+import com.rohan.Khoj.appointment.AppointmentDetailEntity;
+import com.rohan.Khoj.doctor.DoctorDTO;
+import com.rohan.Khoj.clinic.ClinicUpdateRequestDTO;
+import com.rohan.Khoj.appointment.AppointmentDTO;
+import com.rohan.Khoj.appointment.AppointmentUpdateRequestDTO;
+import com.rohan.Khoj.patient.PatientEntity;
+import com.rohan.Khoj.clinic.ClinicEntity;
+import com.rohan.Khoj.doctor.DoctorUpdateRequestDTO;
+import com.rohan.Khoj.doctor.DoctorEntity;
+import com.rohan.Khoj.clinic.ClinicDTO;
+import com.rohan.Khoj.appointment.AppointmentRequestDTO;
+import com.rohan.Khoj.affiliation.DoctorClinicAffiliationEntity;
+import com.rohan.Khoj.patient.PatientDTO;
 
 @Configuration
 public class ModelMapperConfig {
@@ -56,13 +71,6 @@ public class ModelMapperConfig {
                 skip().setCreatedAt(null);           // Set by @PrePersist or service
                 skip().setUpdatedAt(null);           // Set by @PreUpdate or service
 
-                // Map phone numbers from wrapper DTO to entity's Set<String>
-                using( (Converter<Set<MobileNumberWrapperDTO>, Set<String>>) context -> {
-                    if (context.getSource() == null) return new HashSet<>(); // Initialize empty set if null
-                    return context.getSource().stream()
-                            .map(MobileNumberWrapperDTO::getNumber)
-                            .collect(Collectors.toCollection(HashSet::new));
-                }).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
@@ -77,23 +85,14 @@ public class ModelMapperConfig {
                 skip().setCreatedAt(null);
                 skip().setUpdatedAt(null);
 
-                // Map phone numbers from wrapper DTO to entity's Set<String>
-                using( (Converter<Set<MobileNumberWrapperDTO>, Set<String>>) context -> {
-                    if (context.getSource() == null) return null; // If null, means no change to set
-                    return context.getSource().stream()
-                            .map(MobileNumberWrapperDTO::getNumber)
-                            .collect(Collectors.toCollection(HashSet::new)); // Replace with new set
-                }).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
-        // PatientEntity -> PatientDto (for response/retrieval)
+        // PatientEntity -> PatientDTO (for response/retrieval)
         modelMapper.addMappings(new PropertyMap<PatientEntity, PatientDTO>() {
             @Override
             protected void configure() {
                 map().setEmailId(source.getEmailId()); // Ensure consistent mapping if field name varies
-                // Use converter for phoneNumbers from Set<String> to List<String>
-                using(setToListSortedConverter).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
@@ -109,15 +108,7 @@ public class ModelMapperConfig {
                 skip().setCreatedAt(null);
                 skip().setUpdatedAt(null);
                 skip().setClinicAffiliations(null); // Relationships set separately
-                skip().setAppointments(null);
 
-                // Map phone numbers
-                using( (Converter<Set<MobileNumberWrapperDTO>, Set<String>>) context -> {
-                    if (context.getSource() == null) return new HashSet<>();
-                    return context.getSource().stream()
-                            .map(MobileNumberWrapperDTO::getNumber)
-                            .collect(Collectors.toCollection(HashSet::new));
-                }).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
@@ -133,23 +124,14 @@ public class ModelMapperConfig {
                 skip().setCreatedAt(null);
                 skip().setUpdatedAt(null);
                 skip().setClinicAffiliations(null);
-                skip().setAppointments(null);
 
-                // Map phone numbers
-                using( (Converter<Set<MobileNumberWrapperDTO>, Set<String>>) context -> {
-                    if (context.getSource() == null) return null;
-                    return context.getSource().stream()
-                            .map(MobileNumberWrapperDTO::getNumber)
-                            .collect(Collectors.toCollection(HashSet::new));
-                }).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
-        // DoctorEntity -> DoctorDto
+        // DoctorEntity -> DoctorDTO
         modelMapper.addMappings(new PropertyMap<DoctorEntity, DoctorDTO>() {
             @Override
             protected void configure() {
-                using(setToListSortedConverter).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
@@ -166,15 +148,7 @@ public class ModelMapperConfig {
                 skip().setCreatedAt(null);
                 skip().setUpdatedAt(null);
                 skip().setDoctorAffiliations(null);
-                skip().setAppointments(null);
 
-                // Map phone numbers
-                using( (Converter<Set<MobileNumberWrapperDTO>, Set<String>>) context -> {
-                    if (context.getSource() == null) return new HashSet<>();
-                    return context.getSource().stream()
-                            .map(MobileNumberWrapperDTO::getNumber)
-                            .collect(Collectors.toCollection(HashSet::new));
-                }).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
@@ -190,23 +164,14 @@ public class ModelMapperConfig {
                 skip().setCreatedAt(null);
                 skip().setUpdatedAt(null);
                 skip().setDoctorAffiliations(null);
-                skip().setAppointments(null);
 
-                // Map phone numbers
-                using( (Converter<Set<MobileNumberWrapperDTO>, Set<String>>) context -> {
-                    if (context.getSource() == null) return null;
-                    return context.getSource().stream()
-                            .map(MobileNumberWrapperDTO::getNumber)
-                            .collect(Collectors.toCollection(HashSet::new));
-                }).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
-        // ClinicEntity -> ClinicDto
+        // ClinicEntity -> ClinicDTO
         modelMapper.addMappings(new PropertyMap<ClinicEntity, ClinicDTO>() {
             @Override
             protected void configure() {
-                using(setToListSortedConverter).map(source.getPhoneNumbers()).setPhoneNumbers(null);
             }
         });
 
@@ -216,9 +181,6 @@ public class ModelMapperConfig {
         modelMapper.addMappings(new PropertyMap<AppointmentRequestDTO, AppointmentDetailEntity>() {
             @Override
             protected void configure() {
-                skip().setPatient(null); // Set in service
-                skip().setDoctor(null);  // Set in service
-                skip().setClinic(null);  // Set in service
                 skip().setId(null);      // Generated by DB
                 skip().setStatus(null);  // Set by service
                 skip().setReason(null);
@@ -231,9 +193,6 @@ public class ModelMapperConfig {
         modelMapper.addMappings(new PropertyMap<AppointmentUpdateRequestDTO, AppointmentDetailEntity>() {
             @Override
             protected void configure() {
-                skip().setPatient(null);
-                skip().setDoctor(null);
-                skip().setClinic(null);
                 skip().setId(null);
                 skip().setReason(null);
                 // skip().setCreatedAt(null);
@@ -243,17 +202,8 @@ public class ModelMapperConfig {
 
         // Define the single, authoritative mapping for AppointmentDetailEntity -> AppointmentDTO.
         modelMapper.typeMap(AppointmentDetailEntity.class, AppointmentDTO.class).addMappings(mapper -> {
-            // Explicitly map all nested properties. This tells ModelMapper exactly how to get the values.
-
             mapper.map(src -> src.getPatient().getId(), AppointmentDTO::setPatientId);
             mapper.map(src -> src.getPatient().getFirstName() + " " + src.getPatient().getLastName(), AppointmentDTO::setPatientFullName);
-
-            mapper.map(src -> src.getDoctor().getId(), AppointmentDTO::setDoctorId);
-            mapper.map(src -> src.getDoctor().getFirstName() + " " + src.getDoctor().getLastName(), AppointmentDTO::setDoctorFullName);
-            mapper.map(src -> src.getDoctor().getSpecialization(), AppointmentDTO::setDoctorSpecialization);
-
-            mapper.map(src -> src.getClinic().getId(), AppointmentDTO::setClinicId);
-            mapper.map(src -> src.getClinic().getName(), AppointmentDTO::setClinicName);
         });
 
         return modelMapper;
