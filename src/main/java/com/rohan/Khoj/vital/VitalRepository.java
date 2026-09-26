@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface VitalRepository extends JpaRepository<VitalEntity, UUID> {
     List<VitalEntity> findByPatientIdOrderByRecordedAtDesc(UUID patientId, Pageable pageable);
+    List<VitalEntity> findByPatientIdOrderByRecordedAtDesc(UUID patientId);
 }

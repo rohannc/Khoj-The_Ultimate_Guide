@@ -48,8 +48,6 @@ public class HealthRecordService {
     }
 
     private HealthRecordDTO mapToDTO(HealthRecordEntity entity) {
-        HealthRecordDTO dto = modelMapper.map(entity, HealthRecordDTO.class);
-        dto.setPatientId(entity.getPatient().getId());
-        return dto;
+        return modelMapper.map(entity, HealthRecordDTO.class);
     }
 }

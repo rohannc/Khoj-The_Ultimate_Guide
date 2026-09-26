@@ -27,14 +27,21 @@ public class PatientRegistrationService {
     private final PasswordEncoder passwordEncoder;
     public final JwtService jwtService;
     private final UserDetailsService userDetailsService; // Our custom UserDetailsService
+    private final com.rohan.Khoj.security.RefreshTokenService refreshTokenService;
 
     @Autowired
-    public PatientRegistrationService(PatientRepository patientRepository, ModelMapper modelMapper, PasswordEncoder passwordEncoder, JwtService jwtService, UserDetailsService userDetailsService) {
+    public PatientRegistrationService(PatientRepository patientRepository,
+                                    ModelMapper modelMapper,
+                                    PasswordEncoder passwordEncoder,
+                                    JwtService jwtService,
+                                    UserDetailsService userDetailsService,
+                                    com.rohan.Khoj.security.RefreshTokenService refreshTokenService) {
         this.patientRepository = patientRepository;
         this.modelMapper = modelMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -62,7 +69,8 @@ public class PatientRegistrationService {
         PatientEntity savedPatient = patientRepository.save(newPatient);
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-        String token = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateToken(userDetails);
+        com.rohan.Khoj.security.RefreshTokenEntity refreshToken = refreshTokenService.createRefreshToken(savedPatient.getUsername(), savedPatient.getId());
 
         // 6. Map the saved Entity to the success response DTO
         return AuthResponseDTO.builder()
@@ -70,7 +78,8 @@ public class PatientRegistrationService {
                 .userId(savedPatient.getId())
                 .username(savedPatient.getUsername())
                 .userType(UserType.PATIENT)
-                .token(token)
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getToken())
                 .build();
     }
 }

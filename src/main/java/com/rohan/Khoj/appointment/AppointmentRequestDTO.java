@@ -32,7 +32,7 @@ public class AppointmentRequestDTO {
     @FutureOrPresent(message = "Appointment date must be today or in the future")
     private LocalDate appointmentDate;
 
-    @NotNull(message = "Appointment time cannot be null")
+    // appointmentTime is optional when booking, clinic assigns it later along with tokenNumber
     private LocalTime appointmentTime;
 
     @NotBlank(message = "Reason for appointment cannot be blank")

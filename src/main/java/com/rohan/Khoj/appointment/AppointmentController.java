@@ -41,7 +41,7 @@ public class AppointmentController {
             return new ResponseEntity<>(scheduledAppointment, HttpStatus.CREATED);
         } catch (ResourceNotFoundException | ConflictException e) {
             throw e; // Let @ResponseStatus handle 404/409
-        } catch (IllegalArgumentException e) { // Catch potential service-thrown IllegalArgumentException for 400
+        } catch (IllegalArgumentException | IllegalStateException e) {
             throw new BadRequestException(e.getMessage());
         } catch (Exception e) {
             System.err.println("Error scheduling appointment: " + e.getMessage());

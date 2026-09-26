@@ -154,12 +154,30 @@ public class AffiliationService {
     }
 
     private AffiliationResponseDTO buildResponse(DoctorClinicAffiliationEntity affiliation, String message) {
+        String docName = null;
+        if (affiliation.getDoctor() != null) {
+            docName = ((affiliation.getDoctor().getFirstName() != null ? affiliation.getDoctor().getFirstName() : "")
+                    + " " + (affiliation.getDoctor().getLastName() != null ? affiliation.getDoctor().getLastName() : "")).trim();
+        }
+
+        String clinicName = null;
+        String clinicAddress = null;
+        if (affiliation.getClinic() != null) {
+            clinicName = affiliation.getClinic().getName();
+            clinicAddress = (affiliation.getClinic().getCity() != null ? affiliation.getClinic().getCity() : "")
+                    + (affiliation.getClinic().getState() != null ? ", " + affiliation.getClinic().getState() : "");
+            if (clinicAddress.startsWith(", ")) {
+                clinicAddress = clinicAddress.substring(2);
+            }
+        }
+
         return AffiliationResponseDTO.builder()
                 .affiliationId(affiliation.getId())
                 .status(affiliation.getStatus())
                 .message(message)
-                .doctorId(affiliation.getDoctor().getId())
-                .clinicId(affiliation.getClinic().getId())
+                .doctorName(docName)
+                .clinicName(clinicName)
+                .clinicAddress(clinicAddress)
                 .doctorCharge(affiliation.getDoctorCharge())
                 .clinicCharge(affiliation.getClinicCharge())
                 .patientLimits(affiliation.getDailyPatientLimit())

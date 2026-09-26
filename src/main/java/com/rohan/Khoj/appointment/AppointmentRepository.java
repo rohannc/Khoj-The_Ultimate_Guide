@@ -37,23 +37,13 @@ public interface AppointmentRepository extends JpaRepository<AppointmentDetailEn
     List<AppointmentDetailEntity> findByPatientIdAndStatusOrderByAppointmentDateAsc(UUID patientId, String status, org.springframework.data.domain.Pageable pageable);
 
     /**
-     * Counts the number of appointments for a specific affiliation in a given time slot.
-     * This is used to check if a slot's patient limit has been reached.
-     *
-     * @param affiliation The DoctorClinicAffiliationEntity associated with the appointments.
-     * @param slotKey The time slot identifier (e.g., "MONDAY_09:00").
-     * @return The number of appointments found for the given criteria.
+     * Counts the number of appointments for a specific affiliation on a given date.
+     * Used to verify that the daily patient limit has not been exceeded.
      */
-    long countByAffiliationAndAppointmentTimeSlot(DoctorClinicAffiliationEntity affiliation, String slotKey);
+    long countByAffiliationAndAppointmentDate(DoctorClinicAffiliationEntity affiliation, LocalDate appointmentDate);
 
     /**
-     * Counts the number of appointments for a specific patient and affiliation in a given time slot.
-     * This is used to prevent double-booking.
-     *
-     * @param patientId The UUID of the patient.
-     * @param affiliationId The UUID of the affiliation.
-     * @param slotKey   The time slot identifier (e.g., "MONDAY_09:00").
-     * @return The number of appointments found for the given criteria.
+     * Checks if a patient already has an active appointment with this affiliation on a given date.
      */
-    long countByPatientIdAndAffiliationIdAndAppointmentTimeSlot(UUID patientId, UUID affiliationId, String slotKey);
+    long countByPatientIdAndAffiliationIdAndAppointmentDate(UUID patientId, UUID affiliationId, LocalDate appointmentDate);
 }

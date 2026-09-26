@@ -20,6 +20,10 @@ import jakarta.validation.Valid;
 import com.rohan.Khoj.exception.GlobalExceptionHandler;
 import com.rohan.Khoj.exception.UserAlreadyExistsException;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Handles all user and entity registration endpoints.
  * This controller leverages a GlobalExceptionHandler to manage all error responses,
@@ -28,6 +32,7 @@ import com.rohan.Khoj.exception.UserAlreadyExistsException;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Tag(name = "Registration", description = "Endpoints for registering Patients, Doctors, and Clinics")
 public class RegistrationController {
 
     private final PatientRegistrationService patientRegistrationService;
@@ -42,6 +47,9 @@ public class RegistrationController {
      * @param request The patient registration data, which is automatically validated.
      * @return A ResponseEntity with the success response DTO and a 201 CREATED status.
      */
+    @Operation(summary = "Register a new patient and receive access & refresh tokens")
+    @ApiResponse(responseCode = "201", description = "Patient registered successfully")
+    @ApiResponse(responseCode = "400", description = "Validation failure or username/email already taken")
     @PostMapping("/register/patient")
     public ResponseEntity<AuthResponseDTO> registerPatient(@Valid @RequestBody PatientRegistrationRequestDTO request) {
         AuthResponseDTO response = patientRegistrationService.registerPatient(request);
@@ -56,6 +64,9 @@ public class RegistrationController {
      * @param request The DoctorRegistrationRequestDTO containing doctor details.
      * @return ResponseEntity with RegistrationResponseDTO and a 201 CREATED status.
      */
+    @Operation(summary = "Register a new doctor and receive access & refresh tokens")
+    @ApiResponse(responseCode = "201", description = "Doctor registered successfully")
+    @ApiResponse(responseCode = "400", description = "Validation failure or license/username already taken")
     @PostMapping("/register/doctor")
     public ResponseEntity<AuthResponseDTO> registerDoctor(@Valid @RequestBody DoctorRegistrationRequestDTO request) {
         AuthResponseDTO response = doctorRegistrationService.registerDoctor(request);
@@ -70,6 +81,9 @@ public class RegistrationController {
      * @param request The ClinicRegistrationRequestDTO containing clinic details.
      * @return ResponseEntity with RegistrationResponseDTO and a 201 CREATED status.
      */
+    @Operation(summary = "Register a new clinic and receive access & refresh tokens")
+    @ApiResponse(responseCode = "201", description = "Clinic registered successfully")
+    @ApiResponse(responseCode = "400", description = "Validation failure or username/email already taken")
     @PostMapping("/register/clinic")
     public ResponseEntity<AuthResponseDTO> registerClinic(@Valid @RequestBody ClinicRegistrationRequestDTO request) {
         AuthResponseDTO response = clinicRegistrationService.registerClinic(request);

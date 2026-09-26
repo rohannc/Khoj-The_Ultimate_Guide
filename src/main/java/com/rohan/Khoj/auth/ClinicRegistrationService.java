@@ -31,6 +31,7 @@ public class ClinicRegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final com.rohan.Khoj.security.RefreshTokenService refreshTokenService;
 
     @Transactional
     public AuthResponseDTO registerClinic(ClinicRegistrationRequestDTO request) { // Updated DTO name and return type
@@ -43,7 +44,6 @@ public class ClinicRegistrationService {
         }
 
         // 2. Map DTO to Entity using ModelMapper
-        // will handle direct field mappings and phone numbers conversion.
         ClinicEntity newClinic = modelMapper.map(request, ClinicEntity.class);
 
         // 3. Handle password hashing (CRITICAL security step)
@@ -62,8 +62,6 @@ public class ClinicRegistrationService {
             newClinic.setRole(Role.ROLE_CLINIC);
         }
 
-        // Other collections like doctorAffiliations, appointments will be managed separately
-
         System.out.println("Attempting to register new clinic: " + request.getUsername());
 
         try {
@@ -72,7 +70,8 @@ public class ClinicRegistrationService {
             System.out.println("Successfully registered clinic: " + savedClinic.getUsername() + " (ID: " + savedClinic.getId() + ")");
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-            String token = jwtService.generateToken(userDetails);
+            String accessToken = jwtService.generateToken(userDetails);
+            com.rohan.Khoj.security.RefreshTokenEntity refreshToken = refreshTokenService.createRefreshToken(savedClinic.getUsername(), savedClinic.getId());
 
             // 7. Construct and return the AuthResponseDTO
             return AuthResponseDTO.builder()
@@ -80,7 +79,8 @@ public class ClinicRegistrationService {
                     .userId(savedClinic.getId()) // Use 'id' from the saved entity
                     .username(savedClinic.getUsername()) // Use 'username' from the saved entity
                     .userType(UserType.CLINIC) // Set the user type
-                    .token(token)
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken.getToken())
                     .build();
         } catch (Exception e) {
             System.err.println("Failed to register clinic " + request.getUsername() + ": " + e.getMessage());

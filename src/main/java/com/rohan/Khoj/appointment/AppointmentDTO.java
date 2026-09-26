@@ -18,17 +18,16 @@ public class AppointmentDTO {
     private UUID id;
     private LocalDate appointmentDate;
     private LocalTime appointmentTime;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Queue token number assigned by clinic (integer)", example = "5")
+    private Integer tokenNumber;
     private String reason;
     private String status;
 
-    private UUID patientId;
     private String patientFullName;
 
-    private UUID doctorId;
     private String doctorFullName;
     // Included doctor's specialization in the response DTO
     private Set<String> doctorSpecialization;
 
-    private UUID clinicId;
     private String clinicName;
 }

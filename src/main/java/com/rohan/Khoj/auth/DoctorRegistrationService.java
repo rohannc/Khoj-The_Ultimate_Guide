@@ -30,6 +30,7 @@ public class DoctorRegistrationService {
     private final ModelMapper modelMapper; // Inject ModelMapper
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final com.rohan.Khoj.security.RefreshTokenService refreshTokenService;
 
     // No need for UserService.isUsernameTaken() if DoctorRepository can check username directly.
     // If username uniqueness is across all user types (Patient, Doctor, Clinic),
@@ -50,9 +51,6 @@ public class DoctorRegistrationService {
         }
 
         // 2. Map DTO to Entity using ModelMapper
-        // ModelMapper will handle most direct field mappings (firstName, lastName, gender, specialization,
-        // qualifications, experienceYears, registrationIssueDate, medicalLicenseNumber, phoneNumbers).
-        // It also handles username and email to emailId based on your ModelMapperConfig.
         DoctorEntity newDoctor = modelMapper.map(request, DoctorEntity.class);
 
         // 3. Handle password hashing (CRITICAL security step)
@@ -71,12 +69,6 @@ public class DoctorRegistrationService {
             newDoctor.setRole(Role.ROLE_DOCTOR);
         }
 
-        // If DoctorEntity has other collections like clinicAffiliations or appointments,
-        // ensure they are initialized if they might be null after mapping.
-        // newDoctor.setClinicAffiliations(new HashSet<>());
-        // newDoctor.setAppointments(new HashSet<>());
-
-
         System.out.println("Attempting to register new doctor: " + request.getUsername());
 
         try {
@@ -85,7 +77,8 @@ public class DoctorRegistrationService {
             System.out.println("Successfully registered doctor: " + savedDoctor.getUsername() + " (ID: " + savedDoctor.getId() + ")");
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-            String token = jwtService.generateToken(userDetails);
+            String accessToken = jwtService.generateToken(userDetails);
+            com.rohan.Khoj.security.RefreshTokenEntity refreshToken = refreshTokenService.createRefreshToken(savedDoctor.getUsername(), savedDoctor.getId());
 
             // 6. Construct and return the AuthResponseDTO
             return AuthResponseDTO.builder()
@@ -93,7 +86,8 @@ public class DoctorRegistrationService {
                     .userId(savedDoctor.getId()) // Use 'id' from the saved entity
                     .username(savedDoctor.getUsername()) // Use 'username' from the saved entity
                     .userType(UserType.DOCTOR) // Set the user type
-                    .token(token)
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken.getToken())
                     .build();
         } catch (Exception e) {
             System.err.println("Failed to register doctor " + request.getUsername() + ": " + e.getMessage());

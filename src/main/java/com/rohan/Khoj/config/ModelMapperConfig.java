@@ -194,16 +194,79 @@ public class ModelMapperConfig {
             @Override
             protected void configure() {
                 skip().setId(null);
-                skip().setReason(null);
-                // skip().setCreatedAt(null);
-                // skip().setUpdatedAt(null);
             }
         });
 
         // Define the single, authoritative mapping for AppointmentDetailEntity -> AppointmentDTO.
         modelMapper.typeMap(AppointmentDetailEntity.class, AppointmentDTO.class).addMappings(mapper -> {
-            mapper.map(src -> src.getPatient().getId(), AppointmentDTO::setPatientId);
-            mapper.map(src -> src.getPatient().getFirstName() + " " + src.getPatient().getLastName(), AppointmentDTO::setPatientFullName);
+            // Map Clinic info from affiliation
+            mapper.map(src -> src.getAffiliation().getClinic().getName(), AppointmentDTO::setClinicName);
+        });
+
+        // Add a post-converter to handle complex mappings (String concat, parsing Sets, etc.)
+        modelMapper.typeMap(AppointmentDetailEntity.class, AppointmentDTO.class).setPostConverter(context -> {
+            AppointmentDetailEntity source = context.getSource();
+            AppointmentDTO dest = context.getDestination();
+            
+            if (source.getPatient() != null) {
+                dest.setPatientFullName(source.getPatient().getFirstName() + " " + source.getPatient().getLastName());
+            }
+
+            if (source.getAffiliation() != null && source.getAffiliation().getDoctor() != null) {
+                dest.setDoctorFullName(source.getAffiliation().getDoctor().getFirstName() + " " + source.getAffiliation().getDoctor().getLastName());
+                
+                String specStr = source.getAffiliation().getDoctor().getSpecializations();
+                if (specStr != null && !specStr.trim().isEmpty()) {
+                    Set<String> specsSet = new HashSet<>();
+                    for (String spec : specStr.split(",")) {
+                        specsSet.add(spec.trim());
+                    }
+                    dest.setDoctorSpecialization(specsSet);
+                }
+            }
+            return dest;
+        });
+
+        // --- Mappings for Vital Entities and DTOs ---
+        // (Automatic property matching handles biometric fields)
+
+        // --- Mappings for Health Record Entities and DTOs ---
+        // (Automatic property matching handles record fields)
+
+        // --- Mappings for Prescription Entities and DTOs ---
+
+        modelMapper.typeMap(com.rohan.Khoj.prescription.PrescriptionEntity.class, com.rohan.Khoj.prescription.PrescriptionDTO.class).setPostConverter(context -> {
+            com.rohan.Khoj.prescription.PrescriptionEntity source = context.getSource();
+            com.rohan.Khoj.prescription.PrescriptionDTO dest = context.getDestination();
+
+            if (source.getDoctor() != null) {
+                String docName = (source.getDoctor().getFirstName() != null ? source.getDoctor().getFirstName() : "")
+                        + " " + (source.getDoctor().getLastName() != null ? source.getDoctor().getLastName() : "");
+                dest.setDoctorName(docName.trim());
+            }
+
+            if (source.getItems() != null && !source.getItems().isEmpty()) {
+                com.rohan.Khoj.prescription.PrescriptionItemEntity firstItem = source.getItems().iterator().next();
+                dest.setMedicationName(firstItem.getMedicationName());
+                dest.setDosage(firstItem.getDosage());
+                dest.setFrequency(firstItem.getFrequency());
+                dest.setStartedAt(firstItem.getStartedAt());
+                dest.setDurationValue(firstItem.getDurationValue());
+                dest.setDurationUnit(firstItem.getDurationUnit());
+
+                // Calculate endDate if startedAt and duration are present
+                if (firstItem.getStartedAt() != null && firstItem.getDurationValue() != null && firstItem.getDurationUnit() != null) {
+                    java.time.LocalDate end = switch (firstItem.getDurationUnit()) {
+                        case DAY -> firstItem.getStartedAt().plusDays(firstItem.getDurationValue());
+                        case WEEK -> firstItem.getStartedAt().plusWeeks(firstItem.getDurationValue());
+                        case MONTH -> firstItem.getStartedAt().plusMonths(firstItem.getDurationValue());
+                        case YEAR -> firstItem.getStartedAt().plusYears(firstItem.getDurationValue());
+                        case ONGOING -> null;
+                    };
+                    dest.setEndDate(end);
+                }
+            }
+            return dest;
         });
 
         return modelMapper;

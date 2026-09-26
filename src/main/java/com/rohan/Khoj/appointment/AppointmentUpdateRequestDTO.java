@@ -32,10 +32,12 @@ public class AppointmentUpdateRequestDTO {
 
     private LocalTime appointmentTime; // Optional update
 
+    @jakarta.validation.constraints.Positive(message = "Token number must be a positive integer")
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Queue token number assigned by clinic (positive integer only)", example = "1")
+    private Integer tokenNumber; // Assigned by clinic (integer only)
+
     @Size(max = 500, message = "Reason too long")
     private String reason; // Optional update
 
-    // @NotBlank(message = "Status cannot be blank")
-    // @Pattern(regexp = "Scheduled|Confirmed|Cancelled|Completed|Rescheduled", message = "Invalid appointment status")
-    // private String status; // Status is commonly updated
+    private String status; // e.g. REQUESTED, CONFIRMED, SCHEDULED, CANCELLED, COMPLETED
 }

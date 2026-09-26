@@ -37,23 +37,34 @@ public class SecurityConfig {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints (no authentication/authorization required)
                         .requestMatchers(
-                                "/api/auth/register/**",
-                                "/api/auth/login",
+                                "/api/auth/**",          // login, register, refresh, logout
+                                "/error",                // Spring Boot error dispatch
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
+                                "/swagger-ui.html",
                                 "/api/clinics/**",       // All clinic read-only paths
                                 "/api/doctors/**",       // All doctor read-only paths
-                                "/docs"
+                                "/docs",
+                                "/h2-console/**"
                         ).permitAll()
 
-                        // --- Role-Based Authorization Rules ---
-                        // Patients can view/update their own profile and manage their appointments
+                        // Appointments can be booked/viewed by patients, and updated/managed by clinics & doctors
                         .requestMatchers(
-                                "/api/patients/{id}/**",
                                 "/api/appointments/**"
+                        ).hasAnyAuthority(Role.ROLE_PATIENT.name(), Role.ROLE_CLINIC.name(), Role.ROLE_DOCTOR.name())
+
+                        // Prescriptions: patients can view and update start-date, doctors can view/manage
+                        .requestMatchers(
+                                "/api/prescriptions/**"
+                        ).hasAnyAuthority(Role.ROLE_PATIENT.name(), Role.ROLE_DOCTOR.name())
+
+                        // Patients can view/update their own profile
+                        .requestMatchers(
+                                "/api/patients/{id}/**"
                         ).hasAnyAuthority(Role.ROLE_PATIENT.name())
 
                         // Doctors can manage their own profile and affiliations

@@ -64,72 +64,49 @@ public class AppointmentService {
             throw new IllegalStateException("Affiliation between doctor and clinic is not active.");
         }
 
-        // 2. Check Valid Slot: Extract the slot and verify it's a valid working slot.
-        LocalDateTime appointmentDateTime = LocalDateTime.of(requestDTO.getAppointmentDate(), requestDTO.getAppointmentTime());
-        String slotKey = getSlotKey(appointmentDateTime);
-
-        if (!isValidShift(affiliation, appointmentDateTime)) {
-            throw new IllegalStateException("Appointment time is outside the doctor's working hours.");
+        // 2. Check Doctor's Working Day: Verify the doctor has working hours on the selected day
+        if (!isWorkingDay(affiliation, requestDTO.getAppointmentDate().getDayOfWeek().name().toUpperCase())) {
+            throw new IllegalStateException("Doctor does not practice at this clinic on " + requestDTO.getAppointmentDate().getDayOfWeek());
         }
 
-        // 3. Check Patient Limit: Ensure the slot is not full.
-        long appointmentsBooked = appointmentRepository.countByAffiliationAndAppointmentTimeSlot(
-                affiliation, slotKey);
+        // 3. Check Daily Patient Limit: Ensure the daily limit for this affiliation on this date is not full.
+        long appointmentsBooked = appointmentRepository.countByAffiliationAndAppointmentDate(
+                affiliation, requestDTO.getAppointmentDate());
 
         if (appointmentsBooked >= affiliation.getDailyPatientLimit()) {
-            throw new IllegalStateException("Appointment slot is full. Please choose another time.");
+            throw new IllegalStateException("Doctor's appointment limit for this day is full. Please choose another date.");
         }
 
-        // 4. Check for patient's double-booking
-        if (hasPatientBooked(requestDTO.getPatientId(), affiliation.getId(), slotKey)) {
-            throw new IllegalStateException("You already have an appointment in this slot.");
+        // 4. Check for patient's double-booking on the same day with this affiliation
+        if (appointmentRepository.countByPatientIdAndAffiliationIdAndAppointmentDate(
+                requestDTO.getPatientId(), affiliation.getId(), requestDTO.getAppointmentDate()) > 0) {
+            throw new IllegalStateException("You already have an appointment with this doctor/clinic on this date.");
         }
 
         // 5. Create and save the new appointment
-        // Corrected section: Fetch the entities before building the appointment
         PatientEntity patient = patientRepository.findById(requestDTO.getPatientId())
                 .orElseThrow(() -> new IllegalArgumentException("Patient not found."));
-
-        DoctorEntity doctor = affiliation.getDoctor();
-        ClinicEntity clinic = affiliation.getClinic();
 
         AppointmentDetailEntity newAppointment = AppointmentDetailEntity.builder()
                 .patient(patient)
                 .affiliation(affiliation)
                 .appointmentDate(requestDTO.getAppointmentDate())
-                .appointmentTime(requestDTO.getAppointmentTime())
-                .appointmentTimeSlot(slotKey)
+                .appointmentTime(requestDTO.getAppointmentTime()) // null or assigned
+                .tokenNumber(null) // Assigned later by clinic
                 .reason(requestDTO.getReason())
                 .status("SCHEDULED")
                 .build();
 
         AppointmentDetailEntity savedAppointment = appointmentRepository.save(newAppointment);
 
-        // 6. Map the saved entity to a DTO for the response
-        // The re-fetching is no longer needed since the entities are correctly attached.
-        UUID id = savedAppointment.getId();
-        LocalDate appointmentDate = savedAppointment.getAppointmentDate();
-        LocalTime appointmentTime = savedAppointment.getAppointmentTime();
-        String reason = savedAppointment.getReason();
-        String status = savedAppointment.getStatus();
-        UUID patientId = savedAppointment.getPatient().getId();
-        String patientFullName = savedAppointment.getPatient().getFirstName() + " " + savedAppointment.getPatient().getLastName();
-        UUID doctorId = affiliation.getDoctor().getId();
-        String doctorFullName = affiliation.getDoctor().getFirstName() + " " + affiliation.getDoctor().getLastName();
-        
-        Set<String> doctorSpecialization = new HashSet<>(Arrays.asList(affiliation.getDoctor().getSpecializations().split(",")));
-        
-        UUID clinicId = affiliation.getClinic().getId();
-        String clinicName = affiliation.getClinic().getName();
-
-        return new AppointmentDTO(id, appointmentDate, appointmentTime, reason, status, patientId, patientFullName, doctorId, doctorFullName, doctorSpecialization, clinicId, clinicName);
+        // 6. Map the saved entity to DTO using ModelMapper
+        return modelMapper.map(savedAppointment, AppointmentDTO.class);
     }
 
-    private boolean isValidShift(DoctorClinicAffiliationEntity affiliation, LocalDateTime appointmentTime) {
-        String dayOfWeek = appointmentTime.getDayOfWeek().name().toUpperCase();
+    private boolean isWorkingDay(DoctorClinicAffiliationEntity affiliation, String dayOfWeek) {
         LocalTime startTime = null;
         LocalTime endTime = null;
-        
+
         switch (dayOfWeek) {
             case "MONDAY": startTime = affiliation.getMondayStart(); endTime = affiliation.getMondayEnd(); break;
             case "TUESDAY": startTime = affiliation.getTuesdayStart(); endTime = affiliation.getTuesdayEnd(); break;
@@ -140,45 +117,7 @@ public class AppointmentService {
             case "SUNDAY": startTime = affiliation.getSundayStart(); endTime = affiliation.getSundayEnd(); break;
         }
 
-        if (startTime == null || endTime == null) {
-            return false;
-        }
-
-        LocalTime appointmentLocalTime = appointmentTime.toLocalTime();
-        return !(appointmentLocalTime.isBefore(startTime) || appointmentLocalTime.isAfter(endTime));
-    }
-
-    private boolean hasPatientBooked(UUID patientId, UUID affiliationId, String slotKey) {
-        long existingBookings = appointmentRepository.countByPatientIdAndAffiliationIdAndAppointmentTimeSlot(patientId, affiliationId, slotKey);
-        return existingBookings > 0;
-    }
-
-    private String getSlotKey(LocalDateTime appointmentTime) {
-        // Format the day of the week (e.g., "Monday")
-        String day = appointmentTime.getDayOfWeek().name();
-
-        // Format the hour (e.g., "09")
-        int hour = appointmentTime.getHour();
-        String formattedHour = String.format("%02d", hour);
-
-        // Assuming one-hour slots, the minute part is always "00"
-        String formattedTime = formattedHour + ":00";
-
-        return String.format("%s_%s", day, formattedTime); // e.g., "MONDAY_09:00"
-    }
-
-    private boolean isSlotAvailable(DoctorClinicAffiliationEntity affiliation, String slotKey) {
-        // Check if the slot key exists in the dailyPatientLimit map
-        Integer patientLimit = affiliation.getDailyPatientLimit();
-        if (patientLimit == null) {
-            return false; // Slot is not a valid working slot for the doctor
-        }
-
-        // Get the number of appointments already booked for this slot
-        long appointmentsBooked = appointmentRepository.countByAffiliationAndAppointmentTimeSlot(
-                affiliation, slotKey);
-
-        return appointmentsBooked < patientLimit;
+        return startTime != null && endTime != null;
     }
 
     public List<AppointmentDTO> getAllAppointments() {
@@ -192,15 +131,26 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentDTO updateAppointment(UUID id, AppointmentUpdateRequestDTO updateRequestDTO) {
-        // The @EntityGraph on findById ensures all relations are loaded for the update.
         AppointmentDetailEntity appointmentToUpdate = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id: " + id));
 
-        modelMapper.map(updateRequestDTO, appointmentToUpdate);
+        if (updateRequestDTO.getAppointmentDate() != null) {
+            appointmentToUpdate.setAppointmentDate(updateRequestDTO.getAppointmentDate());
+        }
+        if (updateRequestDTO.getAppointmentTime() != null) {
+            appointmentToUpdate.setAppointmentTime(updateRequestDTO.getAppointmentTime());
+        }
+        if (updateRequestDTO.getTokenNumber() != null) {
+            appointmentToUpdate.setTokenNumber(updateRequestDTO.getTokenNumber());
+        }
+        if (updateRequestDTO.getReason() != null) {
+            appointmentToUpdate.setReason(updateRequestDTO.getReason());
+        }
+        if (updateRequestDTO.getStatus() != null) {
+            appointmentToUpdate.setStatus(updateRequestDTO.getStatus());
+        }
 
         AppointmentDetailEntity updatedAppointment = appointmentRepository.save(appointmentToUpdate);
-
-        // No re-fetch needed here either.
         return modelMapper.map(updatedAppointment, AppointmentDTO.class);
     }
 

@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 
 @Data
 @NoArgsConstructor
@@ -14,9 +18,17 @@ import java.util.UUID;
 @Builder
 public class NotificationDTO {
     private UUID id;
-    private UUID userId;
+    @NotBlank(message = "Field cannot be blank")
+
+    @Schema(description = "Details about the field")
     private String title;
+    @NotBlank(message = "Field cannot be blank")
+
+    @Schema(description = "Details about the field")
     private String message;
+    @NotBlank(message = "Field cannot be blank")
+
+    @Schema(description = "Details about the field")
     private String type;
     private Boolean isRead;
     private LocalDateTime createdAt;

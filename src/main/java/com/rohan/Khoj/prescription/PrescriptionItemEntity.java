@@ -28,5 +28,10 @@ public class PrescriptionItemEntity {
 
     private String dosage;
     private String frequency;
-    private Integer durationDays;
+    private java.time.LocalDate startedAt;
+    private Integer durationValue;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "duration_unit")
+    private DurationUnit durationUnit;
 }

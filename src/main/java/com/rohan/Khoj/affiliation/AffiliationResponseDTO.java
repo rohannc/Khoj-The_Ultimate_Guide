@@ -18,8 +18,9 @@ public class AffiliationResponseDTO {
     private UUID affiliationId;
     private AffiliationStatus status;
     private String message;
-    private UUID doctorId;
-    private UUID clinicId;
+    private String doctorName;
+    private String clinicName;
+    private String clinicAddress;
     private Double doctorCharge;
     private Double clinicCharge;
     private Map<String, String> shiftDetails;

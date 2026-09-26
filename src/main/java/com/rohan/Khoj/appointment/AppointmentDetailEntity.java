@@ -47,12 +47,8 @@ public class AppointmentDetailEntity {
     @Column(name = "appointment_date", nullable = false)
     private LocalDate appointmentDate;
 
-    @Column(name = "appointment_time", nullable = false)
+    @Column(name = "appointment_time")
     private LocalTime appointmentTime;
-
-    // New field to store the calculated time slot key
-    @Column(name = "appointment_time_slot", length = 50)
-    private String appointmentTimeSlot;
 
     @Column(name = "token_number")
     private Integer tokenNumber;
