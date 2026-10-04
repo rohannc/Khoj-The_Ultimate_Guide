@@ -29,6 +29,11 @@ public class ClinicService {
     private final ClinicRepository clinicRepository;
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
+    private final com.rohan.Khoj.appointment.AppointmentRepository appointmentRepository;
+    private final com.rohan.Khoj.appointment.AppointmentService appointmentService;
+    private final com.rohan.Khoj.affiliation.AffiliationService affiliationService;
+    private final com.rohan.Khoj.patient.PatientRepository patientRepository;
+    private final com.rohan.Khoj.doctor.DoctorRepository doctorRepository;
 
     // --- Update Operations ---
 
@@ -147,5 +152,75 @@ public class ClinicService {
             throw new ResourceNotFoundException("Clinic not found with id: " + id);
         }
         clinicRepository.deleteById(id);
+    }
+
+    public org.springframework.data.domain.Page<ClinicDTO> searchClinics(String query, String city, String state, String pinCode, org.springframework.data.domain.Pageable pageable) {
+        return clinicRepository.searchClinics(query, city, state, pinCode, pageable)
+                .map(clinic -> modelMapper.map(clinic, ClinicDTO.class));
+    }
+
+    public List<com.rohan.Khoj.patient.PatientDTO> getClinicPatients(UUID clinicId) {
+        if (!clinicRepository.existsById(clinicId)) {
+            throw new ResourceNotFoundException("Clinic not found with id: " + clinicId);
+        }
+        return patientRepository.findDistinctPatientsByClinicId(clinicId).stream()
+                .map(patient -> modelMapper.map(patient, com.rohan.Khoj.patient.PatientDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public ClinicDashboardDTO getClinicDashboard(UUID clinicId) {
+        ClinicEntity clinic = clinicRepository.findById(clinicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Clinic not found with id: " + clinicId));
+        ClinicDTO profile = modelMapper.map(clinic, ClinicDTO.class);
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+
+        // Appointments
+        List<com.rohan.Khoj.appointment.AppointmentDTO> todayAppointments = appointmentService.getAppointmentsForClinicOnDate(clinicId, today);
+        List<com.rohan.Khoj.appointment.AppointmentDTO> allClinicAppointments = appointmentService.getAppointmentsForClinic(clinicId);
+        List<com.rohan.Khoj.appointment.AppointmentDTO> upcomingAppointments = allClinicAppointments.stream()
+                .filter(a -> a.getAppointmentDate() != null && !a.getAppointmentDate().isBefore(today))
+                .limit(10)
+                .collect(Collectors.toList());
+
+        // Affiliations
+        List<com.rohan.Khoj.affiliation.AffiliationResponseDTO> activeAffiliations = 
+                affiliationService.getAffiliationsForClinic(clinicId, com.rohan.Khoj.affiliation.AffiliationStatus.APPROVED);
+        List<com.rohan.Khoj.affiliation.AffiliationResponseDTO> pendingAffiliations = 
+                affiliationService.getAffiliationsForClinic(clinicId, com.rohan.Khoj.affiliation.AffiliationStatus.PENDING);
+
+        // Affiliated Doctors
+        List<com.rohan.Khoj.doctor.DoctorDTO> affiliatedDoctors = activeAffiliations.stream()
+                .map(aff -> aff.getDoctorId())
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .map(doctorRepository::findById)
+                .filter(Optional::isPresent)
+                .map(opt -> modelMapper.map(opt.get(), com.rohan.Khoj.doctor.DoctorDTO.class))
+                .collect(Collectors.toList());
+
+        // Patients
+        List<com.rohan.Khoj.patient.PatientDTO> patients = getClinicPatients(clinicId);
+
+        // Metrics
+        long totalAppointments = appointmentRepository.countByClinicId(clinicId);
+        long todayAppointmentsCount = todayAppointments.size();
+        long totalPatients = patients.size();
+        long activeDoctorsCount = affiliatedDoctors.size();
+
+        return ClinicDashboardDTO.builder()
+                .profile(profile)
+                .totalPatients(totalPatients)
+                .todayAppointmentsCount(todayAppointmentsCount)
+                .totalAppointments(totalAppointments)
+                .activeDoctorsCount(activeDoctorsCount)
+                .pendingAffiliationsCount(pendingAffiliations.size())
+                .todayAppointments(todayAppointments)
+                .upcomingAppointments(upcomingAppointments)
+                .activeAffiliations(activeAffiliations)
+                .pendingAffiliations(pendingAffiliations)
+                .affiliatedDoctors(affiliatedDoctors)
+                .recentPatients(patients.stream().limit(10).collect(Collectors.toList()))
+                .build();
     }
 }

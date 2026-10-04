@@ -29,6 +29,12 @@ public class DoctorService {
     private final DoctorRepository doctorRepository;
     private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
+    private final com.rohan.Khoj.appointment.AppointmentRepository appointmentRepository;
+    private final com.rohan.Khoj.appointment.AppointmentService appointmentService;
+    private final com.rohan.Khoj.affiliation.AffiliationService affiliationService;
+    private final com.rohan.Khoj.patient.PatientRepository patientRepository;
+    private final com.rohan.Khoj.prescription.PrescriptionRepository prescriptionRepository;
+    private final com.rohan.Khoj.prescription.PrescriptionService prescriptionService;
 
     // --- Update Operations ---
 
@@ -153,5 +159,70 @@ public class DoctorService {
             throw new ResourceNotFoundException("Doctor not found with id: " + id);
         }
         doctorRepository.deleteById(id);
+    }
+
+    public org.springframework.data.domain.Page<DoctorDTO> searchDoctors(String query, String specialization, String city, com.rohan.Khoj.common.Gender gender, org.springframework.data.domain.Pageable pageable) {
+        return doctorRepository.searchDoctors(query, specialization, city, gender, pageable)
+                .map(doctor -> modelMapper.map(doctor, DoctorDTO.class));
+    }
+
+    public List<com.rohan.Khoj.patient.PatientDTO> getDoctorPatients(UUID doctorId) {
+        if (!doctorRepository.existsById(doctorId)) {
+            throw new ResourceNotFoundException("Doctor not found with id: " + doctorId);
+        }
+        return patientRepository.findDistinctPatientsByDoctorId(doctorId).stream()
+                .map(patient -> modelMapper.map(patient, com.rohan.Khoj.patient.PatientDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public DoctorDashboardDTO getDoctorDashboard(UUID doctorId) {
+        DoctorEntity doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + doctorId));
+        DoctorDTO profile = modelMapper.map(doctor, DoctorDTO.class);
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+
+        // Appointments
+        List<com.rohan.Khoj.appointment.AppointmentDTO> todayAppointments = appointmentService.getAppointmentsForDoctorOnDate(doctorId, today);
+        List<com.rohan.Khoj.appointment.AppointmentDTO> allDoctorAppointments = appointmentService.getAppointmentsForDoctor(doctorId);
+        List<com.rohan.Khoj.appointment.AppointmentDTO> upcomingAppointments = allDoctorAppointments.stream()
+                .filter(a -> a.getAppointmentDate() != null && !a.getAppointmentDate().isBefore(today))
+                .limit(10)
+                .collect(Collectors.toList());
+
+        // Affiliations
+        List<com.rohan.Khoj.affiliation.AffiliationResponseDTO> activeAffiliations = 
+                affiliationService.getAffiliationsForDoctor(doctorId, com.rohan.Khoj.affiliation.AffiliationStatus.APPROVED);
+        List<com.rohan.Khoj.affiliation.AffiliationResponseDTO> pendingAffiliations = 
+                affiliationService.getAffiliationsForDoctor(doctorId, com.rohan.Khoj.affiliation.AffiliationStatus.PENDING);
+
+        // Patients
+        List<com.rohan.Khoj.patient.PatientDTO> patients = getDoctorPatients(doctorId);
+
+        // Prescriptions
+        List<com.rohan.Khoj.prescription.PrescriptionDTO> prescriptions = prescriptionService.getPrescriptionsByDoctor(doctorId);
+        List<com.rohan.Khoj.prescription.PrescriptionDTO> recentPrescriptions = prescriptions.stream().limit(10).collect(Collectors.toList());
+
+        // Metrics
+        long totalAppointments = appointmentRepository.countByDoctorId(doctorId);
+        long todayAppointmentsCount = todayAppointments.size();
+        long totalPatients = patients.size();
+        long totalRx = prescriptionRepository.countByDoctorId(doctorId);
+
+        return DoctorDashboardDTO.builder()
+                .profile(profile)
+                .totalPatients(totalPatients)
+                .todayAppointmentsCount(todayAppointmentsCount)
+                .totalAppointments(totalAppointments)
+                .activeAffiliationsCount(activeAffiliations.size())
+                .pendingAffiliationsCount(pendingAffiliations.size())
+                .totalPrescriptionsIssued(totalRx)
+                .todayAppointments(todayAppointments)
+                .upcomingAppointments(upcomingAppointments)
+                .activeAffiliations(activeAffiliations)
+                .pendingAffiliations(pendingAffiliations)
+                .recentPatients(patients.stream().limit(10).collect(Collectors.toList()))
+                .recentPrescriptions(recentPrescriptions)
+                .build();
     }
 }

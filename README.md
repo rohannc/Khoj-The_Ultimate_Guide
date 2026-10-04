@@ -15,6 +15,7 @@ The platform is designed with three distinct user roles, each with a tailored da
 
 ### For Doctors 👨‍⚕️
 
+  * **Account & Profile Management:** Secure registration, login, and comprehensive profile management with support for primary and secondary contact phone numbers.
   * **Affiliation Management:** Send affiliation requests to clinics and manage incoming requests (accept, reject, or suggest modifications).
   * **Personal Dashboard:** View account details, a list of affiliated clinics, and statistics on patient treatments.
   * **Patient Overview:** Keep track of all patients treated.

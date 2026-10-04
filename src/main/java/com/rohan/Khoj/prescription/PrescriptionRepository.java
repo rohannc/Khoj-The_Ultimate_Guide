@@ -10,4 +10,7 @@ import java.util.UUID;
 public interface PrescriptionRepository extends JpaRepository<PrescriptionEntity, UUID> {
     List<PrescriptionEntity> findByPatientIdAndIsActiveTrueOrderByIssuedAtDesc(UUID patientId);
     List<PrescriptionEntity> findByPatientId(UUID patientId);
+    List<PrescriptionEntity> findByDoctorIdOrderByIssuedAtDesc(UUID doctorId);
+    java.util.Optional<PrescriptionEntity> findFirstByPatientIdAndDoctorIdOrderByIssuedAtDesc(UUID patientId, UUID doctorId);
+    long countByDoctorId(UUID doctorId);
 }

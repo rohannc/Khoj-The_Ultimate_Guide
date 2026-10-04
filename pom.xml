@@ -60,6 +60,13 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- PostgreSQL Driver for Supabase / Production -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>

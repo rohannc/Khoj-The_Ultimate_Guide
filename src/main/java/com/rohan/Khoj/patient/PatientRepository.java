@@ -24,4 +24,12 @@ public interface PatientRepository extends JpaRepository<PatientEntity, UUID> {
     // Custom query method: Check if a patient with a given email ID already exists
     boolean existsByEmailId(String emailId);
 
+    // Custom query method: Check if a patient with a given username already exists
+    boolean existsByUsername(String username);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT p FROM PatientEntity p JOIN AppointmentDetailEntity a ON a.patient.id = p.id WHERE a.affiliation.doctor.id = :doctorId ORDER BY p.firstName ASC, p.lastName ASC")
+    List<PatientEntity> findDistinctPatientsByDoctorId(@org.springframework.data.repository.query.Param("doctorId") UUID doctorId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT p FROM PatientEntity p JOIN AppointmentDetailEntity a ON a.patient.id = p.id WHERE a.affiliation.clinic.id = :clinicId ORDER BY p.firstName ASC, p.lastName ASC")
+    List<PatientEntity> findDistinctPatientsByClinicId(@org.springframework.data.repository.query.Param("clinicId") UUID clinicId);
 }

@@ -34,4 +34,13 @@ public class PrescriptionItemEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "duration_unit")
     private DurationUnit durationUnit;
+
+    @Column(columnDefinition = "TEXT")
+    private String instructions;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
+    private String discontinueReason;
 }

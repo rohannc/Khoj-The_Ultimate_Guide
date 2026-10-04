@@ -239,6 +239,13 @@ public class ModelMapperConfig {
             com.rohan.Khoj.prescription.PrescriptionEntity source = context.getSource();
             com.rohan.Khoj.prescription.PrescriptionDTO dest = context.getDestination();
 
+            if (source.getPatient() != null) {
+                dest.setPatientId(source.getPatient().getId());
+                String patientName = (source.getPatient().getFirstName() != null ? source.getPatient().getFirstName() : "")
+                        + " " + (source.getPatient().getLastName() != null ? source.getPatient().getLastName() : "");
+                dest.setPatientName(patientName.trim());
+            }
+
             if (source.getDoctor() != null) {
                 String docName = (source.getDoctor().getFirstName() != null ? source.getDoctor().getFirstName() : "")
                         + " " + (source.getDoctor().getLastName() != null ? source.getDoctor().getLastName() : "");
@@ -254,6 +261,10 @@ public class ModelMapperConfig {
                 dest.setDurationValue(firstItem.getDurationValue());
                 dest.setDurationUnit(firstItem.getDurationUnit());
 
+                dest.setInstructions(firstItem.getInstructions() != null ? firstItem.getInstructions() : source.getNotes());
+                dest.setIsActive(firstItem.getIsActive() != null ? firstItem.getIsActive() : source.getIsActive());
+                dest.setDiscontinueReason(firstItem.getDiscontinueReason());
+
                 // Calculate endDate if startedAt and duration are present
                 if (firstItem.getStartedAt() != null && firstItem.getDurationValue() != null && firstItem.getDurationUnit() != null) {
                     java.time.LocalDate end = switch (firstItem.getDurationUnit()) {
@@ -265,6 +276,8 @@ public class ModelMapperConfig {
                     };
                     dest.setEndDate(end);
                 }
+            } else {
+                dest.setInstructions(source.getNotes());
             }
             return dest;
         });

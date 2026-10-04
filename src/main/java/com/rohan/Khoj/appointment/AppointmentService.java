@@ -38,8 +38,6 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final ModelMapper modelMapper;
     private final PatientService patientService;
-    private final DoctorService doctorService;
-    private final ClinicService clinicService;
     private final DoctorClinicAffiliationRepository affiliationRepository;
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
@@ -181,13 +179,15 @@ public class AppointmentService {
     }
 
     public List<AppointmentDTO> getAppointmentsForDoctor(UUID doctorId) {
-        // Since we changed to affiliations, we should probably fetch affiliations for doctor and then fetch appointments for each affiliation
-        return new ArrayList<>(); // To be implemented properly later
+        return appointmentRepository.findByDoctorId(doctorId).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
     }
 
     public List<AppointmentDTO> getAppointmentsForClinic(UUID clinicId) {
-        // Similar to doctor
-        return new ArrayList<>(); // To be implemented properly later
+        return appointmentRepository.findByClinicId(clinicId).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
     }
 
     public List<AppointmentDTO> getAppointmentsByStatus(String status) {
@@ -197,6 +197,14 @@ public class AppointmentService {
     }
 
     public List<AppointmentDTO> getAppointmentsForDoctorOnDate(UUID doctorId, LocalDate date) {
-        return new ArrayList<>(); // To be implemented properly later
+        return appointmentRepository.findByDoctorIdAndDate(doctorId, date).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentDTO> getAppointmentsForClinicOnDate(UUID clinicId, LocalDate date) {
+        return appointmentRepository.findByClinicIdAndDate(clinicId, date).stream()
+                .map(appointmentEntity -> modelMapper.map(appointmentEntity, AppointmentDTO.class))
+                .collect(Collectors.toList());
     }
 }

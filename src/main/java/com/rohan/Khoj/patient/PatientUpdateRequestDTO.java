@@ -24,13 +24,8 @@ import com.rohan.Khoj.common.MobileNumberWrapperDTO;
 public class PatientUpdateRequestDTO {
 
     // --- Base User Fields ---
-    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
-    private String username; // Updatable, uniqueness check in service
+    // username and emailId are immutable and should not be updated via this endpoint.
 
-
-    @Email(message = "Invalid email format")
-    @Size(max = 255, message = "Email too long")
-    private String emailId; // Updatable, uniqueness check in service
 
     // --- Patient Specific Fields ---
     @Size(max = 100, message = "First name must be less than 100 characters")
@@ -42,7 +37,7 @@ public class PatientUpdateRequestDTO {
     @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
 
-    @Pattern(regexp = "Male|Female|Other", message = "Gender must be Male, Female, or Other")
+    @Pattern(regexp = "^(Male|Female|Other)$", flags = Pattern.Flag.CASE_INSENSITIVE, message = "Gender must be Male, Female, or Other")
     private String gender;
 
     @Size(max = 255, message = "Street address too long")
@@ -61,7 +56,6 @@ public class PatientUpdateRequestDTO {
     @Size(max = 100, message = "Country name too long")
     private String country;
 
-    @NotNull(message = "Primary mobile number is required")
     @Size(min = 10, max = 10, message = "Mobile number must be exactly 10 digits")
     @Pattern(regexp = "\\d+", message = "Mobile number must contain only digits")
     private String primaryMobile;

@@ -32,6 +32,7 @@ public class DoctorDTO {
     private String registrationNumber;
 
     private String primaryMobile;
+    private String secondaryMobile;
 
     private LocalDate registrationIssueDate;
 

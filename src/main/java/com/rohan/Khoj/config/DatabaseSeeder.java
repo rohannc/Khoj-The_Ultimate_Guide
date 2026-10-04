@@ -91,14 +91,106 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Transactional
     public void run(String... args) throws Exception {
         PatientEntity patient = seedPatient();
+        PatientEntity patient2 = seedPatient2();
+        PatientEntity patient3 = seedPatient3();
+        
         DoctorEntity doctor = seedDoctor();
+        DoctorEntity doctor2 = seedDoctor2();
+        
         ClinicEntity clinic = seedClinic();
+        ClinicEntity clinic2 = seedClinic2();
         
         patientRepository.flush();
         doctorRepository.flush();
         clinicRepository.flush();
         
         seedDashboardData(patient, doctor, clinic);
+        seedExtraData(patient2, patient3, doctor, doctor2, clinic, clinic2);
+    }
+
+    private PatientEntity seedPatient2() {
+        return patientRepository.findByUsername("patient2").orElseGet(() -> {
+            PatientEntity p = PatientEntity.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000101"))
+                    .username("patient2").password(passwordEncoder.encode("Password@123")).emailId("patient2@khoj.com")
+                    .role(Role.ROLE_PATIENT).firstName("Alice").lastName("Smith").dateOfBirth(LocalDate.of(1992, 2, 2))
+                    .gender(Gender.FEMALE).primaryMobile("9876543211").bloodGroup("A+")
+                    .createdAt(LocalDateTime.of(2025, 1, 1, 9, 0)).build();
+            return patientRepository.save(p);
+        });
+    }
+
+    private PatientEntity seedPatient3() {
+        return patientRepository.findByUsername("patient3").orElseGet(() -> {
+            PatientEntity p = PatientEntity.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000102"))
+                    .username("patient3").password(passwordEncoder.encode("Password@123")).emailId("patient3@khoj.com")
+                    .role(Role.ROLE_PATIENT).firstName("Bob").lastName("Jones").dateOfBirth(LocalDate.of(1985, 3, 3))
+                    .gender(Gender.MALE).primaryMobile("9876543212").bloodGroup("B+")
+                    .createdAt(LocalDateTime.of(2025, 1, 1, 9, 0)).build();
+            return patientRepository.save(p);
+        });
+    }
+
+    private DoctorEntity seedDoctor2() {
+        return doctorRepository.findByUsername("doctor2").orElseGet(() -> {
+            DoctorEntity d = DoctorEntity.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000201"))
+                    .username("doctor2").password(passwordEncoder.encode("Password@123")).emailId("doctor2@khoj.com")
+                    .role(Role.ROLE_DOCTOR).firstName("Jane").lastName("Doe").gender(Gender.FEMALE).primaryMobile("8765432101")
+                    .registrationNumber("MCI-54321").registrationIssueDate(LocalDate.of(2018, 5, 10))
+                    .specializations("Neurologist").qualifications("MBBS, DM").createdAt(LocalDateTime.of(2025, 1, 1, 9, 0)).build();
+            return doctorRepository.save(d);
+        });
+    }
+
+    private ClinicEntity seedClinic2() {
+        return clinicRepository.findByUsername("clinic2").orElseGet(() -> {
+            ClinicEntity c = ClinicEntity.builder()
+                    .id(UUID.fromString("00000000-0000-0000-0000-000000000301"))
+                    .username("clinic2").password(passwordEncoder.encode("Password@123")).emailId("clinic2@khoj.com")
+                    .role(Role.ROLE_CLINIC).name("City Care Clinic").primaryMobile("7654321099")
+                    .city("Pune").state("Maharashtra").createdAt(LocalDateTime.of(2025, 1, 1, 9, 0)).build();
+            return clinicRepository.save(c);
+        });
+    }
+
+    private void seedExtraData(PatientEntity p2, PatientEntity p3, DoctorEntity d1, DoctorEntity d2, ClinicEntity c1, ClinicEntity c2) {
+        if (affiliationRepository.count() < 3) {
+            DoctorClinicAffiliationEntity aff2 = affiliationRepository.save(DoctorClinicAffiliationEntity.builder()
+                .id(UUID.fromString("00000000-0000-0000-0000-000000000401"))
+                .version(0L).doctor(d2).clinic(c1).status(AffiliationStatus.APPROVED).dailyPatientLimit(15)
+                .initiatedBy(com.rohan.Khoj.affiliation.AffiliationRequestInitiator.CLINIC)
+                .actionRequiredBy(com.rohan.Khoj.affiliation.AffiliationActionRequiredBy.DOCTOR)
+                .joiningDate(LocalDate.of(2025, 2, 1)).doctorCharge(600.0).clinicCharge(150.0)
+                .mondayStart(LocalTime.of(10, 0)).mondayEnd(LocalTime.of(14, 0))
+                .build());
+
+            DoctorClinicAffiliationEntity aff3 = affiliationRepository.save(DoctorClinicAffiliationEntity.builder()
+                .id(UUID.fromString("00000000-0000-0000-0000-000000000402"))
+                .version(0L).doctor(d1).clinic(c2).status(AffiliationStatus.APPROVED).dailyPatientLimit(25)
+                .initiatedBy(com.rohan.Khoj.affiliation.AffiliationRequestInitiator.DOCTOR)
+                .actionRequiredBy(com.rohan.Khoj.affiliation.AffiliationActionRequiredBy.CLINIC)
+                .joiningDate(LocalDate.of(2025, 3, 1)).doctorCharge(400.0).clinicCharge(100.0)
+                .tuesdayStart(LocalTime.of(9, 0)).tuesdayEnd(LocalTime.of(17, 0))
+                .build());
+
+            // Add appointments
+            appointmentRepository.save(AppointmentDetailEntity.builder()
+                    .id(UUID.randomUUID()).version(0L).patient(p2).affiliation(aff2)
+                    .appointmentDate(LocalDate.now().plusDays(1)).appointmentTime(LocalTime.of(11, 0))
+                    .tokenNumber(1).status("SCHEDULED").reason("Headache")
+                    .build());
+            
+            appointmentRepository.save(AppointmentDetailEntity.builder()
+                    .id(UUID.randomUUID()).version(0L).patient(p3).affiliation(aff3)
+                    .appointmentDate(LocalDate.now().plusDays(2)).appointmentTime(LocalTime.of(15, 0))
+                    .tokenNumber(2).status("SCHEDULED").reason("Routine Checkup")
+                    .build());
+            
+            // Add vitals
+            vitalRepository.save(VitalEntity.builder().id(UUID.randomUUID()).patient(p2).systolicBp(110).diastolicBp(70).heartRate(65).build());
+        }
     }
 
     private PatientEntity seedPatient() {
@@ -305,6 +397,8 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .startedAt(LocalDate.of(2026, 9, 20))
                     .durationValue(1)
                     .durationUnit(com.rohan.Khoj.prescription.DurationUnit.MONTH)
+                    .instructions("Take after breakfast with water. Avoid excess salt intake.")
+                    .isActive(true)
                     .build();
             rx1.getItems().add(item1);
             prescriptionRepository.save(rx1);
@@ -327,6 +421,8 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .startedAt(LocalDate.of(2026, 9, 15))
                     .durationValue(2)
                     .durationUnit(com.rohan.Khoj.prescription.DurationUnit.MONTH)
+                    .instructions("Take after dinner with milk.")
+                    .isActive(true)
                     .build();
             rx2.getItems().add(item2);
             prescriptionRepository.save(rx2);
@@ -349,6 +445,9 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .startedAt(LocalDate.of(2026, 9, 10))
                     .durationValue(5)
                     .durationUnit(com.rohan.Khoj.prescription.DurationUnit.DAY)
+                    .instructions("Completed course. Drink plenty of fluids.")
+                    .isActive(false)
+                    .discontinueReason("Completed treatment course")
                     .build();
             rx3.getItems().add(item3);
             prescriptionRepository.save(rx3);
@@ -371,6 +470,9 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .startedAt(LocalDate.of(2026, 8, 1))
                     .durationValue(1)
                     .durationUnit(com.rohan.Khoj.prescription.DurationUnit.WEEK)
+                    .instructions("Take at bedtime if sneezing occurs.")
+                    .isActive(false)
+                    .discontinueReason("Symptoms resolved")
                     .build();
             rx4.getItems().add(item4);
             prescriptionRepository.save(rx4);

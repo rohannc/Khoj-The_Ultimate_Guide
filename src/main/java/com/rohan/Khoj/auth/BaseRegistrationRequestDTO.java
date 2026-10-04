@@ -38,4 +38,8 @@ public class BaseRegistrationRequestDTO {
     @Size(min = 10, max = 10, message = "Mobile number must be exactly 10 digits")
     @Pattern(regexp = "\\d+", message = "Mobile number must contain only digits")
     private String primaryMobile;
+
+    @Size(min = 10, max = 10, message = "Secondary mobile number must be exactly 10 digits")
+    @Pattern(regexp = "\\d+", message = "Secondary mobile number must contain only digits")
+    private String secondaryMobile;
 }

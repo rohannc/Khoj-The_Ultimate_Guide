@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import com.rohan.Khoj.common.PasswordUpdateRequestDTO;
@@ -33,6 +35,75 @@ public class PatientService {
     // --- Update Operations ---
 
     /**
+     * Checks if a username is available. If not, generates up to 3 available suggestions.
+     */
+    public UsernameAvailabilityResponseDTO checkUsernameAvailability(String requestedUsername) {
+        boolean isAvailable = !patientRepository.existsByUsername(requestedUsername);
+        List<String> suggestions = new ArrayList<>();
+
+        if (!isAvailable) {
+            suggestions = generateUsernameSuggestions(requestedUsername);
+        }
+
+        return new UsernameAvailabilityResponseDTO(isAvailable, suggestions);
+    }
+
+    private List<String> generateUsernameSuggestions(String baseUsername) {
+        List<String> suggestions = new ArrayList<>();
+        Random random = new Random();
+        int attempts = 0;
+        int currentYear = LocalDateTime.now().getYear();
+
+        String[] prefixes = {"user_", "the_", "iam_"};
+        
+        // 1. Try appending the current year
+        String yearSuggestion = baseUsername + currentYear;
+        if (!patientRepository.existsByUsername(yearSuggestion)) {
+            suggestions.add(yearSuggestion);
+        }
+
+        // 2. Try random numbers
+        while (suggestions.size() < 3 && attempts < 20) {
+            String randomNumSuggestion = baseUsername + (100 + random.nextInt(900)); // 3-digit random
+            if (!suggestions.contains(randomNumSuggestion) && !patientRepository.existsByUsername(randomNumSuggestion)) {
+                suggestions.add(randomNumSuggestion);
+            }
+            attempts++;
+        }
+
+        // 3. Try prefixes if we still need more
+        for (String prefix : prefixes) {
+            if (suggestions.size() >= 3) break;
+            String prefixSuggestion = prefix + baseUsername;
+            if (!suggestions.contains(prefixSuggestion) && !patientRepository.existsByUsername(prefixSuggestion)) {
+                suggestions.add(prefixSuggestion);
+            }
+        }
+
+        return suggestions.size() > 3 ? suggestions.subList(0, 3) : suggestions;
+    }
+
+    @Transactional
+    public void updateUsername(UUID id, UsernameUpdateRequestDTO request) {
+        PatientEntity patient = patientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id: " + id));
+
+        if (patient.getUsername().equals(request.getNewUsername())) {
+            return; // No change needed
+        }
+
+        if (patientRepository.existsByUsername(request.getNewUsername())) {
+            throw new ConflictException("Username '" + request.getNewUsername() + "' is already taken.");
+        }
+
+        patient.setUsername(request.getNewUsername());
+        patient.setUpdatedAt(LocalDateTime.now());
+        patientRepository.save(patient);
+    }
+
+    // --- Update Patient Details ---
+
+    /**
      * Updates an existing patient's details based on the provided DTO.
      * Handles uniqueness checks for username and email. Password updates are handled separately.
      *
@@ -47,26 +118,10 @@ public class PatientService {
         PatientEntity patientToUpdate = patientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found with id: " + id));
 
-        // --- Handle Username Update ---
-        if (updateRequestDTO.getUsername() != null && !updateRequestDTO.getUsername().equals(patientToUpdate.getUsername())) {
-            Optional<PatientEntity> existingPatientWithNewUsername = patientRepository.findByUsername(updateRequestDTO.getUsername());
-            if (existingPatientWithNewUsername.isPresent() && !existingPatientWithNewUsername.get().getId().equals(id)) {
-                throw new ConflictException("Username '" + updateRequestDTO.getUsername() + "' is already taken by another patient.");
-            }
-            patientToUpdate.setUsername(updateRequestDTO.getUsername());
-        }
-
-        // --- Handle Email Update ---
-        if (updateRequestDTO.getEmailId() != null && !updateRequestDTO.getEmailId().equals(patientToUpdate.getEmailId())) {
-            Optional<PatientEntity> existingPatientWithNewEmail = patientRepository.findByEmailId(updateRequestDTO.getEmailId());
-            if (existingPatientWithNewEmail.isPresent()) {
-                throw new ConflictException("Email '" + updateRequestDTO.getEmailId() + "' is already in use by another patient.");
-            }
-            patientToUpdate.setEmailId(updateRequestDTO.getEmailId());
-        }
-
-        // --- Map other fields using ModelMapper (Password is explicitly excluded) ---
-        modelMapper.map(updateRequestDTO, patientToUpdate);
+        // --- Map only the non-null fields from the DTO onto the existing Entity ---
+        ModelMapper patchMapper = new ModelMapper();
+        patchMapper.getConfiguration().setSkipNullEnabled(true);
+        patchMapper.map(updateRequestDTO, patientToUpdate);
 
         // Update updatedAt timestamp
         patientToUpdate.setUpdatedAt(LocalDateTime.now());

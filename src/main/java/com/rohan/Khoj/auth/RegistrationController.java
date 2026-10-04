@@ -61,8 +61,8 @@ public class RegistrationController {
      * All try-catch blocks are removed, as exceptions are now centrally managed by the GlobalExceptionHandler.
      * The service should throw a specific custom exception (e.g., UserAlreadyExistsException) on conflict.
      *
-     * @param request The DoctorRegistrationRequestDTO containing doctor details.
-     * @return ResponseEntity with RegistrationResponseDTO and a 201 CREATED status.
+     * @param request The DoctorRegistrationRequestDTO containing doctor details (including optional secondaryMobile).
+     * @return ResponseEntity with AuthResponseDTO and a 201 CREATED status.
      */
     @Operation(summary = "Register a new doctor and receive access & refresh tokens")
     @ApiResponse(responseCode = "201", description = "Doctor registered successfully")

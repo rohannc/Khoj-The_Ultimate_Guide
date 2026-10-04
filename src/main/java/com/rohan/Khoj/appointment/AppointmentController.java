@@ -145,6 +145,31 @@ public class AppointmentController {
     }
 
     /**
+     * Retrieves appointments for a specific clinic on a specific date.
+     * @param clinicId The UUID of the clinic.
+     * @param date The date of the appointment (format YYYY-MM-DD).
+     * @return ResponseEntity with a list of AppointmentDTO, or HttpStatus.NO_CONTENT if none found.
+     */
+    @GetMapping("/clinic/{clinicId}/date")
+    public ResponseEntity<List<AppointmentDTO>> getAppointmentsForClinicOnDate(
+            @PathVariable UUID clinicId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        try {
+            List<AppointmentDTO> appointments = appointmentService.getAppointmentsForClinicOnDate(clinicId, date);
+            if (appointments.isEmpty()) {
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }
+            return new ResponseEntity<>(appointments, HttpStatus.OK);
+        } catch (ResourceNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Error fetching appointments for clinic " + clinicId + " on " + date + ": " + e.getMessage());
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Retrieves appointments by status.
      * @param status The status to search for (e.g., "Scheduled", "Cancelled").
      * @return ResponseEntity with a list of AppointmentDTO, or HttpStatus.NO_CONTENT if none found.

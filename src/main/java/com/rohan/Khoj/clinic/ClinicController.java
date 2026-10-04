@@ -54,6 +54,28 @@ public class ClinicController {
     }
 
     /**
+     * Retrieves aggregated dashboard data for a clinic (metrics, today's appointments, upcoming, active/pending affiliations, affiliated doctors, recent patients).
+     *
+     * @param id The UUID of the clinic.
+     * @return ResponseEntity with the ClinicDashboardDTO and HTTP 200 OK.
+     */
+    @GetMapping("/{id}/dashboard")
+    public ResponseEntity<ClinicDashboardDTO> getClinicDashboard(@PathVariable UUID id) {
+        return ResponseEntity.ok(clinicService.getClinicDashboard(id));
+    }
+
+    /**
+     * Retrieves all unique patients who have booked or attended appointments with this clinic.
+     *
+     * @param id The UUID of the clinic.
+     * @return ResponseEntity with list of PatientDTO and HTTP 200 OK.
+     */
+    @GetMapping("/{id}/patients")
+    public ResponseEntity<List<com.rohan.Khoj.patient.PatientDTO>> getClinicPatients(@PathVariable UUID id) {
+        return ResponseEntity.ok(clinicService.getClinicPatients(id));
+    }
+
+    /**
      * Updates an existing clinic's profile information.
      * The service layer should ensure the authenticated user has permission to perform this update.
      *
@@ -121,5 +143,18 @@ public class ClinicController {
     public ResponseEntity<List<ClinicDTO>> getClinicsByPinCode(@RequestParam String pinCode) {
         List<ClinicDTO> clinics = clinicService.getClinicsByPinCode(pinCode);
         return ResponseEntity.ok(clinics);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<org.springframework.data.domain.Page<ClinicDTO>> searchClinics(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String pinCode,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        return ResponseEntity.ok(clinicService.searchClinics(query, city, state, pinCode, pageable));
     }
 }

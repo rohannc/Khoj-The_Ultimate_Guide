@@ -37,4 +37,15 @@ public interface DoctorRepository extends JpaRepository<DoctorEntity, UUID> {
     List<DoctorEntity> findBySpecializationsContainingIgnoreCase(String keyword, org.springframework.data.domain.Pageable pageable);
 
     List<DoctorEntity> findByLastNameContainingIgnoreCase(String lastName);
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT d FROM DoctorEntity d LEFT JOIN d.clinicAffiliations a LEFT JOIN a.clinic c " +
+           "WHERE (:query IS NULL OR LOWER(d.firstName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(d.lastName) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "AND (:specialization IS NULL OR LOWER(d.specializations) LIKE LOWER(CONCAT('%', :specialization, '%'))) " +
+           "AND (:city IS NULL OR LOWER(c.city) LIKE LOWER(CONCAT('%', :city, '%'))) " +
+           "AND (:gender IS NULL OR d.gender = :gender)")
+    org.springframework.data.domain.Page<DoctorEntity> searchDoctors(
+            @org.springframework.data.repository.query.Param("query") String query, 
+            @org.springframework.data.repository.query.Param("specialization") String specialization, 
+            @org.springframework.data.repository.query.Param("city") String city, 
+            @org.springframework.data.repository.query.Param("gender") com.rohan.Khoj.common.Gender gender, 
+            org.springframework.data.domain.Pageable pageable);
 }

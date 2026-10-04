@@ -67,15 +67,20 @@ public class SecurityConfig {
                                 "/api/patients/{id}/**"
                         ).hasAnyAuthority(Role.ROLE_PATIENT.name())
 
-                        // Doctors can manage their own profile and affiliations
+                        // Affiliations management for Doctors and Clinics
                         .requestMatchers(
+                                "/api/affiliations/**",
                                 "/api/doctor/affiliations/**",
+                                "/api/clinic/affiliations/**"
+                        ).hasAnyAuthority(Role.ROLE_DOCTOR.name(), Role.ROLE_CLINIC.name())
+
+                        // Doctors can manage their own profile and resources
+                        .requestMatchers(
                                 "/api/doctors/{id}/**"
                         ).hasAnyAuthority(Role.ROLE_DOCTOR.name())
 
-                        // Clinics can manage their own profile and affiliations
+                        // Clinics can manage their own profile
                         .requestMatchers(
-                                "/api/clinic/affiliations/**",
                                 "/api/clinics/{id}/**"
                         ).hasAnyAuthority(Role.ROLE_CLINIC.name())
 

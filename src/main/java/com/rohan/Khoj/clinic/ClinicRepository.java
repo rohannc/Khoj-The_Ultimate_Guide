@@ -30,4 +30,15 @@ public interface ClinicRepository extends JpaRepository<ClinicEntity, UUID> {
     Optional<ClinicEntity> findByEmailId(@Email(message = "Invalid email format") @Size(max = 255, message = "Email too long") String email);
 
     Optional<Object> findByCityContainingIgnoreCase(String city);
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM ClinicEntity c " +
+           "WHERE (:query IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "AND (:city IS NULL OR LOWER(c.city) LIKE LOWER(CONCAT('%', :city, '%'))) " +
+           "AND (:state IS NULL OR LOWER(c.state) LIKE LOWER(CONCAT('%', :state, '%'))) " +
+           "AND (:pinCode IS NULL OR c.pinCode = :pinCode)")
+    org.springframework.data.domain.Page<ClinicEntity> searchClinics(
+            @org.springframework.data.repository.query.Param("query") String query, 
+            @org.springframework.data.repository.query.Param("city") String city, 
+            @org.springframework.data.repository.query.Param("state") String state, 
+            @org.springframework.data.repository.query.Param("pinCode") String pinCode, 
+            org.springframework.data.domain.Pageable pageable);
 }

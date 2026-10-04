@@ -16,6 +16,9 @@ import com.rohan.Khoj.exception.GlobalExceptionHandler;
 import com.rohan.Khoj.exception.ResourceNotFoundException;
 import com.rohan.Khoj.common.MessageResponseDTO;
 import com.rohan.Khoj.common.PasswordUpdateRequestDTO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * REST Controller for managing patient-related operations.
@@ -24,6 +27,7 @@ import com.rohan.Khoj.common.PasswordUpdateRequestDTO;
 @RestController
 @RequestMapping("/api/patients")
 @RequiredArgsConstructor
+@Tag(name = "Patients", description = "Operations related to patient profiles")
 public class PatientController {
 
     private final PatientService patientService;
@@ -62,7 +66,9 @@ public class PatientController {
      * @param updateRequest The DTO containing the updated patient details.
      * @return ResponseEntity with the updated PatientDTO and HTTP 200 OK.
      */
-    @PutMapping("/{id}")
+    @Operation(summary = "Update patient profile", description = "Performs a partial update of patient details")
+    @ApiResponse(responseCode = "200", description = "Successfully updated the patient profile")
+    @PatchMapping("/{id}")
     @PreAuthorize("principal.id.toString() == #id.toString()")
     public ResponseEntity<PatientDTO> updatePatientProfile(@PathVariable UUID id, @Valid @RequestBody PatientUpdateRequestDTO updateRequest) {
         PatientDTO updatedPatient = patientService.updatePatient(id, updateRequest);
@@ -78,6 +84,8 @@ public class PatientController {
      * @param passwordRequest The DTO containing the old and new password.
      * @return ResponseEntity with a success message and HTTP 200 OK.
      */
+    @Operation(summary = "Update patient password", description = "Securely updates a patient's password")
+    @ApiResponse(responseCode = "200", description = "Password updated successfully")
     @PatchMapping("/{id}/password")
     @PreAuthorize("principal.id.toString() == #id.toString()")
     public ResponseEntity<MessageResponseDTO> updatePatientPassword(@PathVariable UUID id, @Valid @RequestBody PasswordUpdateRequestDTO passwordRequest) {
@@ -111,10 +119,33 @@ public class PatientController {
     }
 
     @GetMapping("/search/by-email")
+    @Operation(summary = "Get patient by email", description = "Finds a single patient by their email address")
     public ResponseEntity<PatientDTO> getPatientByEmail(@RequestParam String email) {
         return patientService.getPatientByEmail(email)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new com.rohan.Khoj.exception.ResourceNotFoundException("Patient not found with email: " + email));
+    }
+
+    // --- Username Endpoints ---
+
+    @GetMapping("/username/available")
+    @Operation(summary = "Check username availability", description = "Checks if a username is taken. Returns suggestions if it is.")
+    @ApiResponse(responseCode = "200", description = "Successfully checked availability")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UsernameAvailabilityResponseDTO> checkUsernameAvailability(@RequestParam String username) {
+        UsernameAvailabilityResponseDTO response = patientService.checkUsernameAvailability(username);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}/username")
+    @Operation(summary = "Update patient username", description = "Securely updates a patient's username")
+    @ApiResponse(responseCode = "200", description = "Username updated successfully")
+    @PreAuthorize("principal.id.toString() == #id.toString()")
+    public ResponseEntity<MessageResponseDTO> updatePatientUsername(
+            @PathVariable UUID id, 
+            @Valid @RequestBody UsernameUpdateRequestDTO request) {
+        patientService.updateUsername(id, request);
+        return ResponseEntity.ok(new MessageResponseDTO("Username updated successfully."));
     }
 
     @GetMapping("/search/by-city")
