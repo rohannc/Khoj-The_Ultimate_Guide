@@ -9,6 +9,7 @@ import com.rohan.Khoj.exception.BadRequestException;
 import com.rohan.Khoj.patient.PatientEntity;
 import com.rohan.Khoj.patient.PatientRepository;
 import com.rohan.Khoj.security.RefreshTokenService;
+import com.rohan.Khoj.notification.OtpNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,6 +32,7 @@ public class PasswordResetService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final OtpNotificationService otpNotificationService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int OTP_VALIDITY_MINUTES = 10;
@@ -85,11 +87,14 @@ public class PasswordResetService {
 
         passwordResetTokenRepository.save(tokenEntity);
 
-        // Deliver OTP (console/log delivery, ready for email/SMS integration)
+        // Deliver OTP via configured Email and SMS services (with specified sender IDs)
+        otpNotificationService.sendEmailOtp(email, otp);
+        otpNotificationService.sendSmsOtp(primaryMobile, otp);
+
         log.info("==========================================================");
-        log.info("[PASSWORD RESET OTP] For User: {} ({})", email, matchedUser.userType);
-        log.info("[PASSWORD RESET OTP] OTP CODE: {}", otp);
-        log.info("[PASSWORD RESET OTP] Valid for {} minutes", OTP_VALIDITY_MINUTES);
+        log.info("[PASSWORD RESET OTP DISPATCHED] For User: {} ({})", email, matchedUser.userType);
+        log.info("[PASSWORD RESET OTP DISPATCHED] OTP CODE: {}", otp);
+        log.info("[PASSWORD RESET OTP DISPATCHED] Valid for {} minutes", OTP_VALIDITY_MINUTES);
         log.info("==========================================================");
     }
 
