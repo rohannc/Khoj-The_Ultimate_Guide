@@ -27,11 +27,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "Endpoints for user login, access token refresh, and logout")
+@Tag(name = "Authentication", description = "Endpoints for user login, access token refresh, logout, and password recovery (forgot/reset password)")
 public class AuthenticationController {
 
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordResetService passwordResetService;
 
     /**
      * Authenticates a user (Patient, Doctor, or Clinic) and returns JWT access and refresh tokens.
@@ -101,5 +102,46 @@ public class AuthenticationController {
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of("message", "Logged out."));
         }
+    }
+
+    /**
+     * Initiates the forgot password flow by verifying matching registered email and primary mobile number.
+     * Generates a 6-digit OTP valid for 10 minutes.
+     *
+     * @param request The ForgotPasswordRequestDTO containing email and primaryMobile.
+     * @return 200 OK with confirmation message.
+     */
+    @Operation(
+            summary = "Initiate forgot password request",
+            description = "Verifies identity using registered email and primary mobile. If valid, generates a 6-digit OTP valid for 10 minutes."
+    )
+    @ApiResponse(responseCode = "200", description = "Password reset request processed")
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO request) {
+        passwordResetService.initiateForgotPassword(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "If the provided email and primary mobile match an active account, a 6-digit OTP has been sent."
+        ));
+    }
+
+    /**
+     * Resets the account password using the verified 6-digit OTP.
+     * Encrypts the new password and automatically revokes all active refresh tokens for security.
+     *
+     * @param request The ResetPasswordRequestDTO containing email, otp, and newPassword.
+     * @return 200 OK confirming successful password update.
+     */
+    @Operation(
+            summary = "Reset password with OTP",
+            description = "Verifies the 6-digit OTP and updates the account password. Automatically revokes existing sessions for security."
+    )
+    @ApiResponse(responseCode = "200", description = "Password reset successfully")
+    @ApiResponse(responseCode = "400", description = "Invalid or expired OTP, or too many failed attempts")
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO request) {
+        passwordResetService.resetPassword(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Password has been reset successfully. Please log in with your new password."
+        ));
     }
 }

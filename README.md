@@ -132,6 +132,8 @@ For testing, the database includes pre-seeded user accounts (password for all se
 | **Auth** | `POST` | `/api/auth/register` | Public |
 | **Auth** | `POST` | `/api/auth/login` | Public |
 | **Auth** | `POST` | `/api/auth/refresh` | Public |
+| **Auth** | `POST` | `/api/auth/forgot-password` | Public |
+| **Auth** | `POST` | `/api/auth/reset-password` | Public |
 | **Patients** | `GET` / `PUT` | `/api/patients/{id}` | Patient / Admin |
 | **Doctors** | `GET` / `PUT` | `/api/doctors/{id}` | Public (Read), Doctor (Write) |
 | **Clinics** | `GET` / `PUT` | `/api/clinics/{id}` | Public (Read), Clinic (Write) |
