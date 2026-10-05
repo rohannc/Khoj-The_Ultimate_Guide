@@ -31,9 +31,9 @@ public interface ClinicRepository extends JpaRepository<ClinicEntity, UUID> {
 
     Optional<Object> findByCityContainingIgnoreCase(String city);
     @org.springframework.data.jpa.repository.Query("SELECT c FROM ClinicEntity c " +
-           "WHERE (:query IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%'))) " +
-           "AND (:city IS NULL OR LOWER(c.city) LIKE LOWER(CONCAT('%', :city, '%'))) " +
-           "AND (:state IS NULL OR LOWER(c.state) LIKE LOWER(CONCAT('%', :state, '%'))) " +
+           "WHERE (CAST(:query AS string) IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%'))) " +
+           "AND (CAST(:city AS string) IS NULL OR LOWER(c.city) LIKE LOWER(CONCAT('%', CAST(:city AS string), '%'))) " +
+           "AND (CAST(:state AS string) IS NULL OR LOWER(c.state) LIKE LOWER(CONCAT('%', CAST(:state AS string), '%'))) " +
            "AND (:pinCode IS NULL OR c.pinCode = :pinCode)")
     org.springframework.data.domain.Page<ClinicEntity> searchClinics(
             @org.springframework.data.repository.query.Param("query") String query, 
