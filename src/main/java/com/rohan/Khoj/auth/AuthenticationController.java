@@ -115,12 +115,13 @@ public class AuthenticationController {
             summary = "Initiate forgot password request",
             description = "Verifies identity using registered email and primary mobile. If valid, generates a 6-digit OTP valid for 10 minutes."
     )
-    @ApiResponse(responseCode = "200", description = "Password reset request processed")
+    @ApiResponse(responseCode = "200", description = "OTP generated and dispatched successfully")
+    @ApiResponse(responseCode = "400", description = "Email not found or primary mobile does not match records")
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO request) {
         passwordResetService.initiateForgotPassword(request);
         return ResponseEntity.ok(Map.of(
-                "message", "If the provided email and primary mobile match an active account, a 6-digit OTP has been sent."
+                "message", "Verification code (OTP) has been sent to your registered email and mobile number."
         ));
     }
 

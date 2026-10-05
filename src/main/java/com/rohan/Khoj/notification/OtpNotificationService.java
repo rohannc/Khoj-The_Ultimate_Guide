@@ -17,7 +17,7 @@ public class OtpNotificationService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${application.notification.mail.from:support@khojhealth.com}")
+    @Value("${application.notification.mail.from:${spring.mail.username:support@khojhealth.com}}")
     private String mailFrom;
 
     @Value("${application.notification.sms.from-sender-id:KHOJ}")
