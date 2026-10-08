@@ -3,10 +3,14 @@ package com.rohan.Khoj.notification;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
 
 @Slf4j
 @Service
@@ -15,7 +19,14 @@ public class OtpNotificationService {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public OtpNotificationService(RestTemplateBuilder restTemplateBuilder) {
+        this.restTemplate = restTemplateBuilder
+                .setConnectTimeout(Duration.ofSeconds(5))
+                .setReadTimeout(Duration.ofSeconds(5))
+                .build();
+    }
 
     @Value("${application.notification.mail.from:${spring.mail.username:support@khojhealth.com}}")
     private String mailFrom;
@@ -30,13 +41,10 @@ public class OtpNotificationService {
     private String smsApiKey;
 
     /**
-     * Sends the OTP to the user's email address.
-     * If JavaMailSender is configured (e.g. spring.mail.host), it sends an actual email.
-     * Otherwise, it logs the simulated email dispatch clearly.
-     *
-     * @param toEmail The recipient's email address.
-     * @param otp The 6-digit OTP.
+     * Sends the OTP to the user's email address asynchronously in a background thread.
+     * Prevents hanging or slowing down client HTTP requests.
      */
+    @Async
     public void sendEmailOtp(String toEmail, String otp) {
         log.info("[EMAIL NOTIFICATION] Preparing OTP email FROM: '{}' TO: '{}'", mailFrom, toEmail);
 
@@ -70,13 +78,14 @@ public class OtpNotificationService {
     }
 
     /**
-     * Sends the OTP to the user's mobile phone via SMS / WhatsApp.
+     * Sends the OTP to the user's mobile phone via SMS / WhatsApp asynchronously.
      * If an SMS API URL and Key are provided, it dispatches the SMS via HTTP.
      * Otherwise, it logs the simulated SMS dispatch clearly.
      *
      * @param toMobile The recipient's 10-digit primary mobile number.
      * @param otp The 6-digit OTP.
      */
+    @Async
     public void sendSmsOtp(String toMobile, String otp) {
         log.info("[SMS NOTIFICATION] Preparing OTP SMS FROM SENDER: '{}' TO: '+91-{}'", smsSenderId, toMobile);
 
